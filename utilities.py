@@ -10,9 +10,6 @@ from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
 from copy import copy
 from re import sub
-from MyKeithley2450 import Keithley2450
-from MyKeithley2700 import Keithley2700
-from MyAFG1022 import AFG1022 
 from PyQt5.QtCore import QObject, QTimer, QEventLoop, pyqtSignal
 from PyQt5.QtWidgets import QTimeEdit, QSpinBox
 from math import log10
@@ -20,8 +17,9 @@ from numpy import logspace, linspace, diff
 from time import sleep
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
-from keithley195 import Keithley195
-from advantestTR6845 import AdvantestTR6845
+from random import randint
+#from keithley195 import Keithley195
+#from advantestTR6845 import AdvantestTR6845
 
 class FakeAdapter():
     """Provides a fake adapter for debugging purposes.
@@ -68,8 +66,13 @@ class FakeAdapter():
         def method(*args):
             pass
         return method
-
-
+    
+    def get_current_values(self):
+        z = randint(1000,10000)
+        p = randint(1,100)
+        sleep(0.2)
+        # now emit it to the GUI
+        
 def connectDevice(inst,addr,test = False):
     try:
         return inst(addr), 1

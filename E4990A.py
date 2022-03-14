@@ -8,6 +8,7 @@ Created on Mon Mar  7 17:07:10 2022
 from pymeasure.instruments import Instrument
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 from pyvisa.errors import VisaIOError
+from time import sleep
 
 """
 Important commands:
@@ -137,19 +138,552 @@ Select trigger source; accept the values:
         else:
             return a_data, b_data
 
-    # TODO: maybe refactor as property?
-    def aperture(self, time=None, averages=1):
+    def continuous_measurement(self,continuous="ON"):
         """
-        Set and get aperture.
-        :param time: integration time as string: SHORT, MED, LONG (case insensitive);
-            if None, get values
-        :param averages: number of averages, numeric
+        Syntax
+        :INITiate<Ch>:CONTinuous {ON|OFF|1|0}
+        
+        :INITiate<Ch>:CONTinuous?
+        
+        Description
+        This command turns ON/OFF the continuous initiation mode (setting by which the trigger system initiates continuously) in the trigger system.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        ON/OFF of the continuous initiation mode
+        
+        Data Type
+        
+        Boolean type (Boolean)
+        
+        Range
+        
+        ON|OFF|1|0
+        
+        Preset Value
+        
+        OFF
+        
+        Query Response
+        {1|0}<newline><^END>
+        
+        Examples
+
+        Returns
+        -------
+        None.
+
         """
-        if time is None:
-            read_values = self.ask(":APER?").split(',')
-            return read_values[0], int(read_values[1])
-        else:
-            if time.upper() in ["SHORT", "MED", "LONG"]:
-                self.write(f":APER {time}, {averages}")
-            else:
-                raise Exception("Time must be a string: SHORT, MED, LONG")
+        self.write(":INIT1:CONT {}".format(continuous))
+    
+    def abort(self):
+        """
+        This command aborts the current sweep.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":ABOR")
+    
+    def read_measurement_data(self):
+        """
+        Syntax
+        :CALCulate<Ch>[:SELected]:DATA:FDATa <Value>
+        
+        :CALCulate<Ch>[:SELected]:DATA:FDATa?
+        
+        Description
+        This command sets/gets the formatted data array.
+        
+        The array data element varies in the data format. If valid data is not calculated because of the invalid measurement, “1.#QNB” is read out.
+        
+        Variable
+        Parameter
+                
+        Value
+        
+        Description
+        
+        Formatted data array
+        
+        Where n is an integer between 1 and NOP (number of measurement points):
+        
+        <numeric n×2-1>:  primary parameter at the n-th measurement point. (For the complex format or the polar format, real part of data)
+        
+        <numeric n×2>: secondary parameter at the n-th measurement point. Always 0 when the data format is not the complex or polar formats. (For the complex format or the polar format, imaginary part of data)
+        
+        The number of data is {NOP×2}
+        
+        Data Type
+        
+        Variant type Array (Range)
+        
+        Note
+        
+        If there is no array data of NOP×2 when setting a formatted data array, an error occurs when executed.
+        
+        Query Response
+        {numeric 1}, .... ,{numeric NOP×2}<newline><^END>
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        data = self.ask(":CALC1:DATA:FDAT?")
+        data = data.split(',')
+        return [float(x) for x in data]
+    
+    def get_frequencies(self):
+        """
+        Description
+        This command returns the frequency stimulus data.
+        
+        Variable
+        Parameter
+        
+        Value
+        
+        Description
+        
+        Indicates the array data (frequency) of NOP (number of measurement points). Where n is an integer between 1 and NOP.
+        
+        Data(n-1): Frequency at the n-th measurement point
+        
+        The index of the array starts from 0.
+        
+        Data Type
+        
+        Variant type Array (Range)
+        
+        Query Response
+        {numeric 1}, .... ,{numeric NOP}<newline><^END>
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
+        """
+        return self.ask(":SENS1:FREQ:DATA?")
+    
+    def reset_to_default_continuous_measurement(self):
+        """
+        This command presets the setting state of the E4990A to the original factory setting (Default Conditions). 
+        This command is different from *RST as the continuous startup mode (:INIT:CONT) of channel 1 is set to ON.
+
+        Returns
+        -------
+        None.
+
+        """
+        
+        self.write(":SYST:PRES")
+    
+    def trig_from_PC(self):
+        """
+        Syntax
+        :TRIGger[:SEQuence]:SOURce {INTernal|EXTernal|MANual|BUS}
+        
+        :TRIGger[:SEQuence]:SOURce?
+        
+        Description
+        This command sets/gets the trigger source from the following 4 types:
+        
+        Internal Trigger: Uses the internal trigger to generate continuous triggers automatically.
+        
+        External Trigger: Generates a trigger when the trigger signal is inputted externally via the Ext Trig connector or the handler interface.
+        
+        Manual Trigger: Generates a trigger when the key operation of Trigger > Trigger is executed from the front panel.
+        
+        Bus Trigger: Generates a trigger when the *TRG is executed.
+        
+        When you change the trigger source during sweep, the sweep is aborted.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        Trigger source
+        
+        Data Type
+        
+        Character string type (String)
+        
+        Range
+        
+        INTernal|EXTernal|MANual|BUS
+        
+        Preset Value
+        
+        INTernal
+        
+        Query Response
+        {INT|EXT|MAN|BUS}<newline><^END>
+        
+
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":TRIG:SOUR BUS")
+    
+    def set_measurement_parameter(self):
+        """
+        Syntax
+        :CALCulate<Ch>:PARameter<Tr>:DEFine {Z|Y|R|X|G|B|LS|LP|CS|CP|RS|RP|Q|D|TZ|TY|VAC|IAC|VDC|IDC|IMP|ADM}
+        
+        :CALCulate<Ch>:PARameter<Tr>:DEFine?
+        
+        Description
+        This command sets/gets the measurement parameter. The VDC or IDC can be selected only at bias sweep or log bias sweep.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        Measurement parameter
+        
+        Data Type
+        
+        Character string type (String)
+        
+        Range
+        
+        Z: Absolute impedance value
+        Y: Absolute admittance
+        R: Equivalent series resistance
+        X: Equivalent series reactance
+        G: Equivalent parallel conductance
+        B: Equivalent parallel susceptance
+        
+        LS: Equivalent series inductance
+        LP: Equivalent parallel inductance
+        
+        CS: Equivalent series capacitance
+        CP: Equivalent parallel capacitance
+        
+        RS: Equivalent series resistance
+        RP: Equivalent parallel resistance
+        
+        Q: Q value
+        D: Dissipation factor
+        
+        TZ: Impedance phase
+        TY: Absolute phase
+        
+        VAC: OSC level (Voltage)
+        IAC: OSC level (Current)
+        VDC: DC Bias (Voltage)
+        IDC: DC Bias (Current)
+        
+        IMP: Impedance (complex value)
+        ADM: Admittance (complex value)
+        
+        Preset Value
+        
+        Z
+        
+        Query Response
+        {Z|Y|R|X|G|B|LS|LP|CS|CP|RS|RP|Q|D|TZ|TY|VAC|IAC|VDC|IDC|IMP|ADM}<newline><^END>
+
+        Returns
+        -------
+        None.
+
+        """
+        # set trace 1 to measure absolute impedance Z
+        self.write(":CALC1:PAR1:DEF Z")
+        
+        # set trace 2 to measure impedance phase
+        self.write(":CALC1:PAR2:DEF TZ")
+    
+    def set_yAxis_log(self):
+        """
+        Syntax
+        :DISPlay:WINDow<Ch>:TRACe<Tr>:Y:SPACing {LINear|LOGarithmic}
+        
+        :DISPlay:WINDow<Ch>:TRACe<Tr>:Y:SPACing?
+        
+        Description
+        This command sets the display type of the graph vertical axis (Y-axis).
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        Vertical axis display type of the graph
+        
+        Data Type
+        
+        Character string type (String)
+        
+        Range
+        
+        LINear|LOGarithmic
+        
+        Preset Value
+        
+        LINear
+        
+        Query Response
+        {LIN|LOG}<newline><^END>
+        
+
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":DISP:WIND1:TRAC1:Y:SPAC LOG")
+    
+    def fix_frequency(self,freq):
+        """
+        Description
+        This command sets/gets the continuous wave frequency.
+        
+        Variable
+        Parameter
+        
+        Value
+        
+        Description
+        
+        Continuous wave frequency
+        
+        Data Type
+        
+        Numeric type (Real)
+        
+        Range
+        
+        20 ~ 120M
+        
+        Preset Value
+        
+        1M
+        
+        Unit
+        
+        Hz
+        
+        Resolution
+        
+        1m
+        
+        Query Response
+        {numeric}<newline><^END>
+        
+
+
+        Parameters
+        ----------
+        freq : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":SENS1:FREQ:CW {}".format(freq))
+    
+    def select_voltage_source(self):
+        """
+        Description
+        This command sets/gets the unit for OSC level.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        OSC unit
+        
+        Data Type
+        
+        Character string type (String)
+        
+        Range
+        
+        VOLTage|CURRent
+        
+        Preset Value
+        
+        VOLTage
+        
+        Query Response
+        {VOLT|CURR}<newline><^END>
+        
+
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":SOUR1:MODE VOLT")
+    
+    def fix_AC_Voltage(self,volt):
+        """
+        Description
+        This command sets/gets the source voltage level.
+        
+        Variable
+        Parameter
+        
+        Value
+        
+        Description
+        
+        Voltage level
+        
+        Data Type
+        
+        Numeric type (Real)
+        
+        Range
+        
+        5m ~ 1
+        
+        Preset Value
+        
+        500m
+        
+        Unit
+        
+        V
+        
+        Resolution
+        
+        1m
+        
+        Query Response
+        {numeric}<newline><^END>
+        
+        Parameters
+               ----------
+               volt : TYPE
+                   DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":SOUR1:VOLT {}".format(volt))
+    
+    def enable_auto_level_control(self):
+        """
+        Description
+        This command turn on/off the ALC function.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        ALC On/Off status
+        
+        Data Type
+        
+        Boolean type (Boolean)
+        
+        Range
+        
+        ON|OFF|1|0
+        
+        Preset Value
+        
+        OFF
+        
+        Query Response
+        {1|0}<newline><^END>
+        
+
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":SOUR1:ALC ON")
+    
+    def display_off(self):
+        """
+        Syntax
+        :DISPlay:WINDow<Ch>:TRACe<Tr>:STATe {ON|OFF|1|0}
+        
+        :DISPlay:WINDow<Ch>:TRACe<Tr>:STATe?
+        
+        Description
+        This command turns ON/OFF the data trace display.
+        
+        Variable
+        Parameter
+        
+        Selection Option
+        
+        Description
+        
+        ON/OFF of the data trace display
+        
+        Data Type
+        
+        Boolean type (Boolean)
+        
+        Range
+        
+        ON|OFF|1|0
+        
+        Preset Value
+        
+        ON
+        
+        Query Response
+        {1|0}<newline><^END>
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":DISPlay:WINDow1:TRACe1:STATe OFF")
+        self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
+    
+    def get_current_values(self):
+        self.write(":Calculate1:Parameter1:Sel")
+        z = self.ask(":Calculate1:Data:Fdat")
+        z = z.split(',')
+        z = [float(x) for x in z]
+        sleep(0.1)
+        self.write(":Calculate1:Parameter2:Sel")
+        p = self.ask(":Calculate1:Data:Fdat")
+        p = z.split(',')
+        p = [float(x) for x in p]
+        sleep(0.1)
+        
