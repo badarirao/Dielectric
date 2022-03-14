@@ -114,4 +114,4 @@ dmypy.json
 .pyre/
 
 # design file
-impedance.ui
+*.ui

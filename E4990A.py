@@ -17,7 +17,13 @@ Important commands:
     ":INIT1:CONT ON" # for continuous measurement on channel 1
     "*OPC?" # wait for measurement to finish
     
-
+Required functions:
+    continuously display impedance
+    frequency sweep
+    calibration
+    set measurement accuracy
+    apply DC bias (and sweep option)
+    set ac voltage
 
 """
 class KeysightE44990A(Instrument):
