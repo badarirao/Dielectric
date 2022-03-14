@@ -17,8 +17,9 @@ from numpy import logspace, linspace, diff
 from time import sleep
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
-from random import randint
+from random import randint, uniform
 from time import sleep
+from PyQt5.QtCore import pyqtSignal
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
@@ -43,9 +44,25 @@ class FakeAdapter():
 
     _buffer = ""
 
-    def __init__(self):
+    def __init__(self, freq = 1000, Vac = 0.1, Vdc = 0, temp = 'NA'):
         self.address = ''
         self.ID = 'Fake'
+        self._freq = freq
+        self.getFreqUnit()
+        self.Vac = Vac
+        self.Vdc = Vdc
+        self.temperature = temp
+
+    def getFreqUnit(self):
+        if 20 <= self._freq < 1000:
+            self.freqUnit = 'Hz'
+            self.freq = self._freq
+        elif 1000 <= self._freq < 1000000:
+            self.freqUnit = 'kHz'
+            self.freq = self._freq/1000
+        elif self._freq >= 1000000:
+            self.freqUnit = 'MHz'
+            self.freq = self._freq/1000000
 
     def read(self):
         """Return last commands given after the last read call."""
@@ -71,8 +88,24 @@ class FakeAdapter():
     def get_current_values(self):
         z = randint(1000,10000)
         p = randint(1,100)
+        c = uniform(1e-7,1e-12)
+        d = uniform(0,1)
         sleep(0.2)
+        return z,p,c,d
         # now emit it to the GUI
+    
+    def update_frequency(self, freq):
+        self._freq = freq
+        self.getFreqUnit()
+    
+    def update_temperature(self, temp):
+        self.temperature = temp
+    
+    def update_Vac(self, Vac):
+        self.Vac = Vac
+    
+    def update_Vdc(self, Vdc):
+        self.Vdc = Vdc
         
 def connectDevice(inst,addr,test = False):
     try:
@@ -154,3 +187,28 @@ def checkInstrument(E4990Addr = None, k2700Addr = None, K195Addr = None, TR6845A
         k2700.write('DISPLAY:TEXT:STATE ON')
         k2700.write('DISPLAY:TEXT:DATA "KEYSIGHT USE"')
     return E4990, k2700, K195, TR6845
+
+class IdleWorker(QObject):
+    finished = pyqtSignal()
+    data = pyqtSignal(list)
+    stopcall = pyqtSignal()
+    
+    def __init__(self, impd = None):
+        super(IdleWorker,self).__init__()
+        self.impd = impd
+        self.stopCall = False
+        self.stopcall.connect(self.stopcalled)
+    
+    def stopcalled(self):
+        self.stopCall = True
+    
+    def get_status(self):
+        z, p, c, d = self.impd.get_current_values()
+        self.data.emit([z,p,c,d])
+    
+    def start(self):
+        while True:
+            self.get_status()
+            if self.stopCall == True:
+                break
+        self.finished.emit()

@@ -15,6 +15,8 @@ from dielectric import Ui_ImpedanceApp
 from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
 from numpy import loadtxt
 from templist import Ui_Form
+from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
+from utilities import IdleWorker, FakeAdapter
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -29,6 +31,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startButton.clicked.connect(self.startProgram)
         self.stopButton.clicked.connect(self.stopProgram)
         self.loadTempButton.clicked.connect(self.loadTemperatures)
+        self.fixedFreq.valueChanged.connect(self.updateFixedFrequency)
+        self.fixedFreqUnit.currentIndexChanged.connect(self.updateFixedFrequency)
+        self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
+        self.fixedACvolt.valueChanged.connect(self.updateACVoltage)
+        self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.measureModeSet()
@@ -36,6 +43,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.temperatures = []
         self.freqsweep = True
         self.lastfreqstate = 'sweep'
+        self.impd = FakeAdapter()
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
         self.Form = QtWidgets.QWidget()
@@ -44,6 +52,35 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.loadTempButton.clicked.connect(self.showTempTable)
         # TODO: Make a default temperature table, and load it in the beginning.
         """
+    
+    def updateFixedDCVoltage(self):
+        self.impd.Vdc = self.fixedDCvolt.value()
+        self.DCvoltStatus.setText("{} V".format(round(self.impd.Vdc,3)))
+        
+    def updateACVoltage(self):
+        self.impd.Vac = self.fixedACvolt.value()
+        self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
+        
+    def updateFixedTemperature(self):
+        self.impd.temperature = self.fixedTemp.value()
+        # TODO: change it to actual temperature (currently showing set temperature)
+        self.tempStatus.setText("{}".format(round(self.impd.temperature,2)))
+        
+    def updateFixedFrequency(self):
+        multiply = 1
+        if self.fixedFreqUnit.currentIndex() == 0:
+            self.fixedFreq.setMinimum(20)
+        elif self.fixedFreqUnit.currentIndex() == 1:
+            self.fixedFreq.setMinimum(0)
+            multiply = 1000
+        elif self.fixedFreqUnit.currentIndex() == 2:
+            self.fixedFreq.setMinimum(0)
+            multiply = 1000000
+        self.impd._freq = self.fixedFreq.value()*multiply
+        self.fixedFreq.setMaximum(10000000/multiply)
+        self.impd.getFreqUnit()
+        self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
+    
     
     def showTempTable(self):
         self.Form.show()
@@ -167,13 +204,60 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.Vncycles.setEnabled(False)
     
     def continuousDisplay(self):
-        pass
+        self.startIdleThread()
+        self.showControllerStatus()
         
+    def startIdleThread(self):
+        self.thread = QThread()
+        self.idleWorker = IdleWorker(self.impd)
+        self.idleWorker.moveToThread(self.thread)
+        self.thread.started.connect(self.idleWorker.start)
+        self.idleWorker.finished.connect(self.thread.quit)
+        self.idleWorker.finished.connect(self.idleWorker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.idleWorker.data.connect(self.showStatus)
+        #self.thread.finished.connect(self.finishAction)
+        self.thread.start()
+        
+    def showControllerStatus(self):
+        self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
+        if self.impd.temperature != 'NA':
+            self.tempStatus.setText("{} K".format(self.impd.temperature))
+        else:
+            self.tempStatus.setText("{}".format(self.impd.temperature))
+        self.ACvoltStatus.setText("{} V".format(self.impd.Vac))
+        self.DCvoltStatus.setText("{} V".format(self.impd.Vdc))
+        
+    def showStatus(self, data):
+        self.ZReStatus.setText("{} Ω".format(data[0]))
+        self.ZImStatus.setText("{}".format(data[1]))
+        capacitance = data[2]
+        if capacitance > 0.1:
+            capUnit = 'F'
+        elif 0.1 >= capacitance > 1e-4:
+            capUnit = 'mF'
+            capacitance*=1000
+        elif 1e-4 >= capacitance > 1e-7:
+            capUnit = 'μF'
+            capacitance*=1e6
+        elif 1e-7 >= capacitance > 1e-10:
+            capUnit = 'nF'
+            capacitance*=1e9
+        elif 1e-10 >= capacitance:
+            capUnit = 'pF'
+            capacitance*=1e12
+        self.capStatus.setText("{0} {1}".format(round(capacitance,3), capUnit))
+        self.tandStatus.setText("{}".format(round(data[3],3)))
+    
     def startProgram(self):
-        print(self.temptable.model._data)
+        #print(self.temptable.model._data)
+        self.idleWorker.stopcall.emit()
+        self.statusBox.setEnabled(False)
     
     def stopProgram(self):
-        pass
+        self.startIdleThread()
+        self.showControllerStatus()
+        self.statusBox.setEnabled(True)
     
     def closeEvent(self, event):
         quit_msg = "Are you sure you want to exit the program?"

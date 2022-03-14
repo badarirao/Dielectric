@@ -7,6 +7,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph import PlotWidget, ViewBox, mkPen
 
 class Ui_ImpedanceApp(object):
     def setupUi(self, ImpedanceApp):
@@ -18,7 +19,7 @@ class Ui_ImpedanceApp(object):
         self.gridLayout_10 = QtWidgets.QGridLayout(self.centralwidget)
         self.gridLayout_10.setObjectName("gridLayout_10")
         self.frequencyBox = QtWidgets.QGroupBox(self.centralwidget)
-        self.frequencyBox.setMaximumSize(QtCore.QSize(300, 16777215))
+        self.frequencyBox.setMaximumSize(QtCore.QSize(261, 16777215))
         self.frequencyBox.setObjectName("frequencyBox")
         self.gridLayout = QtWidgets.QGridLayout(self.frequencyBox)
         self.gridLayout.setObjectName("gridLayout")
@@ -109,7 +110,8 @@ class Ui_ImpedanceApp(object):
         self.horizontalLayout_3.addWidget(self.npoints)
         self.gridLayout.addLayout(self.horizontalLayout_3, 4, 0, 1, 3)
         self.gridLayout_10.addWidget(self.frequencyBox, 0, 0, 1, 1)
-        self.ImpdPlot = PlotWidget(self.centralwidget)
+        self.ImpdPlot = PlotWidget(self.centralwidget,viewBox=ViewBox(border = mkPen(color='k',width = 2)))
+        self.ImpdPlot.setBackground((255,182,193,25))
         self.ImpdPlot.setMinimumSize(QtCore.QSize(0, 0))
         self.ImpdPlot.setObjectName("ImpdPlot")
         self.gridLayout_10.addWidget(self.ImpdPlot, 0, 1, 4, 2)
@@ -118,17 +120,17 @@ class Ui_ImpedanceApp(object):
         self.voltageBox.setObjectName("voltageBox")
         self.gridLayout_8 = QtWidgets.QGridLayout(self.voltageBox)
         self.gridLayout_8.setObjectName("gridLayout_8")
-        self.acVoltage = QtWidgets.QLabel(self.voltageBox)
-        self.acVoltage.setObjectName("acVoltage")
-        self.gridLayout_8.addWidget(self.acVoltage, 0, 0, 1, 1)
-        self.doubleSpinBox = QtWidgets.QDoubleSpinBox(self.voltageBox)
-        self.doubleSpinBox.setDecimals(3)
-        self.doubleSpinBox.setMinimum(0.005)
-        self.doubleSpinBox.setMaximum(1.0)
-        self.doubleSpinBox.setSingleStep(0.001)
-        self.doubleSpinBox.setProperty("value", 0.1)
-        self.doubleSpinBox.setObjectName("doubleSpinBox")
-        self.gridLayout_8.addWidget(self.doubleSpinBox, 0, 1, 1, 1)
+        self.acVoltageLabel = QtWidgets.QLabel(self.voltageBox)
+        self.acVoltageLabel.setObjectName("acVoltageLabel")
+        self.gridLayout_8.addWidget(self.acVoltageLabel, 0, 0, 1, 1)
+        self.fixedACvolt = QtWidgets.QDoubleSpinBox(self.voltageBox)
+        self.fixedACvolt.setDecimals(3)
+        self.fixedACvolt.setMinimum(0.005)
+        self.fixedACvolt.setMaximum(1.0)
+        self.fixedACvolt.setSingleStep(0.001)
+        self.fixedACvolt.setProperty("value", 0.1)
+        self.fixedACvolt.setObjectName("fixedACvolt")
+        self.gridLayout_8.addWidget(self.fixedACvolt, 0, 1, 1, 1)
         self.DCvoltageBox = QtWidgets.QGroupBox(self.voltageBox)
         self.DCvoltageBox.setCheckable(True)
         self.DCvoltageBox.setChecked(False)
@@ -210,7 +212,7 @@ class Ui_ImpedanceApp(object):
         self.gridLayout_8.addWidget(self.DCvoltageBox, 1, 0, 1, 2)
         self.gridLayout_10.addWidget(self.voltageBox, 1, 0, 1, 1)
         self.statusBox = QtWidgets.QGroupBox(self.centralwidget)
-        self.statusBox.setMaximumSize(QtCore.QSize(390, 16777215))
+        self.statusBox.setMaximumSize(QtCore.QSize(500, 16777215))
         self.statusBox.setObjectName("statusBox")
         self.gridLayout_5 = QtWidgets.QGridLayout(self.statusBox)
         self.gridLayout_5.setObjectName("gridLayout_5")
@@ -654,7 +656,7 @@ class Ui_ImpedanceApp(object):
         self.gridLayout_10.addWidget(self.temperatureBox, 2, 0, 2, 1)
         ImpedanceApp.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(ImpedanceApp)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1208, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1208, 20))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -713,7 +715,7 @@ class Ui_ImpedanceApp(object):
         self.fixFreq.setText(_translate("ImpedanceApp", "Fix Frequency"))
         self.pointsLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Number of points</span></p></body></html>"))
         self.voltageBox.setTitle(_translate("ImpedanceApp", "Voltage"))
-        self.acVoltage.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">AC Voltage (V<sub>rms</sub>)</span></p></body></html>"))
+        self.acVoltageLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">AC Voltage (V<sub>rms</sub>)</span></p></body></html>"))
         self.DCvoltageBox.setTitle(_translate("ImpedanceApp", "DC Bias Sweep"))
         self.voltagePointsLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Number of points</span></p></body></html>"))
         self.fixDCvolts.setText(_translate("ImpedanceApp", "Fix DC Bias"))
@@ -783,8 +785,6 @@ class Ui_ImpedanceApp(object):
         self.actionDC_Current.setText(_translate("ImpedanceApp", "DC Current"))
         self.actionCalibration.setText(_translate("ImpedanceApp", "Calibration"))
         self.actionExit.setText(_translate("ImpedanceApp", "Exit"))
-
-from pyqtgraph import PlotWidget
 
 if __name__ == "__main__":
     import sys
