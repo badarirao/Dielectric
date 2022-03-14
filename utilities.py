@@ -18,6 +18,7 @@ from time import sleep
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
 from random import randint
+from time import sleep
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
