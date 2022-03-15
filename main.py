@@ -16,7 +16,8 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
 from numpy import loadtxt
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
-from utilities import IdleWorker, FakeAdapter
+from utilities import IdleWorker, FakeImpd, FrequencySweepWorker
+from time import sleep
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -43,7 +44,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.temperatures = []
         self.freqsweep = True
         self.lastfreqstate = 'sweep'
-        self.impd = FakeAdapter()
+        self.impd = FakeImpd()
+        self.stopButton.setEnabled(False)
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
         self.Form = QtWidgets.QWidget()
@@ -208,16 +210,16 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.showControllerStatus()
         
     def startIdleThread(self):
-        self.thread = QThread()
+        self.idlethread = QThread()
         self.idleWorker = IdleWorker(self.impd)
-        self.idleWorker.moveToThread(self.thread)
-        self.thread.started.connect(self.idleWorker.start)
-        self.idleWorker.finished.connect(self.thread.quit)
+        self.idleWorker.moveToThread(self.idlethread)
+        self.idlethread.started.connect(self.idleWorker.start)
+        self.idleWorker.finished.connect(self.idlethread.quit)
         self.idleWorker.finished.connect(self.idleWorker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+        self.idlethread.finished.connect(self.idlethread.deleteLater)
         self.idleWorker.data.connect(self.showStatus)
         #self.thread.finished.connect(self.finishAction)
-        self.thread.start()
+        self.idlethread.start()
         
     def showControllerStatus(self):
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
@@ -253,13 +255,45 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #print(self.temptable.model._data)
         self.idleWorker.stopcall.emit()
         self.statusBox.setEnabled(False)
+        self.stopButton.setEnabled(True)
+        self.startButton.setEnabled(False)
+        if not self.fixFreq.isChecked():
+            self.startFreqSweepThread()
     
+    def startFreqSweepThread(self):
+        self.freqthread = QThread()
+        sf = self.startFreq.value()
+        su = self.startFreqUnit.currentIndex()
+        ef = self.stopFreq.value()
+        eu = self.stopFreqUnit.currentIndex()
+        np = self.npoints.value()
+        sp = self.spacingType.currentIndex()
+        self.fSweepWorker = FrequencySweepWorker(self.impd,sf,su,ef,eu,np,sp)
+        self.fSweepWorker.moveToThread(self.freqthread)
+        self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
+        self.fSweepWorker.finished.connect(self.finishAction)
+        self.fSweepWorker.finished.connect(self.freqthread.quit)
+        self.fSweepWorker.finished.connect(self.fSweepWorker.deleteLater)
+        self.freqthread.finished.connect(self.freqthread.deleteLater)
+        self.fSweepWorker.data.connect(self.plotFsweepData)
+        #self.thread.finished.connect(self.finishAction)
+        self.freqthread.start()
+    
+    def plotFsweepData(self,data):
+        print(len(data[0]),len(data[1]))
+        
+    def finishAction(self):
+        self.stopProgram()
+        
     def stopProgram(self):
         self.startIdleThread()
         self.showControllerStatus()
         self.statusBox.setEnabled(True)
+        self.startButton.setEnabled(True)
+        self.stopButton.setEnabled(False)
     
     def closeEvent(self, event):
+        self.idleWorker.stopcall.emit()
         quit_msg = "Are you sure you want to exit the program?"
         reply = QtGui.QMessageBox.question(self, 'Confirm Exit',
                                            quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
@@ -268,7 +302,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             event.accept()
         else:
             event.ignore()
-
+            self.startIdleThread()
+            self.showControllerStatus()
+            
 def main():
     app = QtWidgets.QApplication(sys.argv)
     main = mainControl()

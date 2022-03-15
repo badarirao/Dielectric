@@ -686,4 +686,15 @@ Select trigger source; accept the values:
         p = z.split(',')
         p = [float(x) for x in p]
         sleep(0.1)
+    
+    def is_sweep_complete(self):
+        ans = float(self.ask("*OPC?"))
+        if ans == 0:
+            return False
+        else:
+            return True
+    
+    def start_fSweep(self):
+        self.write(":TRIG:SINGLE")
+        
         
