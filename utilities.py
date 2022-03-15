@@ -71,13 +71,48 @@ class FakeAdapter():
             pass
         return method
 
+class FakeTempController(FakeAdapter):
+    """Provides a fake Temperature controler for debugging purposes.
 
+    Bounces back the command so that arbitrary values testing is possible.
+
+    """
+    def __init__(self, temp=300):
+        super().__init__()
+        self._temp = temp
+        self.startT = 300
+        self.stopT = 10
+        self.rate = -1 # degreee per minute
+        self.mode = 0
+        self.tCount = 0
+    
+    @property
+    def temp(self):
+        return self._temp
+
+    @temp.setter
+    def temp(self, value):
+        if self._temp != value:
+            self._temp = value
+    
+    def rampT(self):
+        fsweeptime = 1 # time taken for 1 cycle of frequency sweep in minutes, need to be calculated later
+        total_time = abs((self.startT-self.stopT)/self.rate) # minutes
+        tpoints = int(total_time/fsweeptime)
+        self.templist = linspace(self.startT,self.stopT,tpoints+1)
+    
+    def isRunning(self):
+        self.temp = self.templist[self.tCount]
+        self.tCount += 1
+        if self.tCount >= len(self.templist):
+            return False
+        return True
+    
 class FakeImpd(FakeAdapter):
     """Provides a fake Impedance analyzer for debugging purposes.
 
     Bounces back the command so that arbitrary values testing is possible.
 
-    Note: Adopted from Pymeasure package
     """
 
     def __init__(self, freq=1000, Vac=0.1, Vdc=0, temp='NA'):
@@ -135,7 +170,7 @@ class FakeImpd(FakeAdapter):
             return freq*1e6
         
     def is_sweep_complete(self):
-        if self.sweepCount > 100:
+        if self.sweepCount > 10:
             return True
         else:
             self.sweepCount += 1
@@ -321,15 +356,13 @@ class FrequencySweepWorker(QObject):
     data = pyqtSignal(list)
     stopcall = pyqtSignal()
 
-    def __init__(self, impd=None, start=20, startUnits = 0, end=1e7, endUnits = 0, npoints = 50, spacing = 1):
+    def __init__(self, impd=None):
         super().__init__()
         self.impd = impd
-        self.start = start
-        self.startUnits = startUnits
-        self.end = end
-        self.endUnits = endUnits
-        self.npoints = npoints
-        self.spacing = spacing
+        self.start = self.impd.startf
+        self.end = self.impd.endf
+        self.npoints = self.impd.npointsf
+        self.spacing = self.impd.sweeptypef
         if self.impd == None:
             self.impd = FakeImpd()
         self.stopCall = False
@@ -340,12 +373,7 @@ class FrequencySweepWorker(QObject):
 
     def start_frequency_sweep(self):
         # TODO add option to set DC bias also
-        self.start = self.impd.get_absolute_frequency(self.start, self.startUnits)
-        self.end = self.impd.get_absolute_frequency(self.end, self.endUnits)
-        self.impd.startf = self.start
-        self.impd.endf = self.end
-        self.impd.npointsf = self.npoints
-        self.impd.sweeptypef = self.spacing
+        
         self.impd.write(":INIT1:CONT ON")
         if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
@@ -383,7 +411,71 @@ class FrequencySweepWorker(QObject):
         self.data.emit(wholedata)
         self.finished.emit()
 
+class TemperatureSweepWorkerF(QObject):
+    finished = pyqtSignal()
+    data = pyqtSignal(list)
+    stopcall = pyqtSignal()
 
+    def __init__(self, impd=None, TCont = None):
+        super().__init__()
+        self.impd = impd
+        self.TCont = TCont
+        if self.impd == None:
+            self.impd = FakeImpd()
+        if self.TCont == None:
+            self.TCont = FakeTempController()
+        self.stopCall = False
+        self.stopcall.connect(self.stopcalled)
+
+    def stopcalled(self):
+        self.stopCall = True
+
+    def start_temperature_sweep(self):
+        # TODO add option to set DC bias also
+        self.impd.write(":INIT1:CONT ON")
+        if self.impd.sweeptypef == 0:   # set sweep type
+            self.impd.write(":SENS1:SWE:TYPE LIN")
+        elif self.impd.sweeptypef == 1:
+            self.impd.write(":SENS1:SWE:TYPE LOG") 
+        elif self.impd.sweeptypef == 2:
+            segments = get_linlog_segment_list(self.impd.startf, self.impd.endf, self.impd.npointsf)
+            Segments = []
+            self.impd.write(":SENS1:SWE:TYPE SEGM")
+            segmentFormat =  "7,0,1,0,0,0,0,0,{}".format(len(segments))
+            for seg in segments:
+                seg.extend(["0","{}".format(self.impd.Vac)])
+                Segments.append(','.join([str(s) for s in seg]))
+            segCommand = segmentFormat
+            for seg in Segments:
+                segCommand += ',' + seg
+            self.impd.write(":SENS1:SWE:TYPE LIN") 
+            self.impd.write(":SENS1:SEGM:DATA {}".format(segCommand)) 
+        if self.impd.sweeptypef != 2:
+            self.impd.write(":SENS1:SWE:POIN {}".format(self.impd.npointsf+1)) # set number of points
+            self.impd.write(":SENS1:FREQ:STAR {}".format(self.impd.startf)) # set start frequency
+            self.impd.write(":SENS1:FREQ:STOP {}".format(self.impd.endf)) # set stop frequency
+            self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
+            self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        if self.TCont.mode == 0:
+            self.TCont.rampT()
+            self.TCont.tCount = 0
+            while self.TCont.isRunning():
+                self.impd.start_fSweep()
+                # TODO: Set the display on the instrument as desired
+                self.impd.sweepCount = 0
+                while not self.impd.is_sweep_complete():
+                    if self.stopCall == True:
+                        self.impd.abort()
+                    sleep(0.1)
+                wholedata = self.impd.read_measurement_data()
+                wholedata.append(self.TCont.temp)
+                self.data.emit(wholedata)
+                if self.stopCall == True:
+                    self.TCont.abort()
+                    break
+            self.finished.emit()
+        
 def get_frequencies_list(start, end, npoints, spacing):
     # spacing = 0, 1, 2 = linear, log10, linear-Log10
     if start < 20:
