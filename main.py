@@ -16,7 +16,7 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
 from numpy import loadtxt, array, vstack, hstack, linspace
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
-from utilities import IdleWorker, FakeImpd, FrequencySweepWorker, TemperatureSweepWorkerF
+from utilities import IdleWorker, FakeImpd, FrequencySweepWorker, TemperatureSweepWorkerF, checkInstrument
 from time import sleep
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
@@ -47,7 +47,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.TFsweepRun = False
         self.FsweepRun = False
         self.lastfreqstate = 'sweep'
-        self.impd = FakeImpd()
+        self.impd, self.Tcont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
         self.stopButton.setEnabled(False)
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
@@ -67,9 +67,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
         
     def updateFixedTemperature(self):
-        self.impd.temperature = self.fixedTemp.value()
+        self.Tcont.temp = self.fixedTemp.value()
         # TODO: change it to actual temperature (currently showing set temperature)
-        self.tempStatus.setText("{}".format(round(self.impd.temperature,2)))
+        self.tempStatus.setText("{}".format(round(self.Tcont.temp,2)))
         
     def updateFixedFrequency(self):
         multiply = 1
@@ -230,10 +230,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def showControllerStatus(self):
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
-        if self.impd.temperature != 'NA':
-            self.tempStatus.setText("{} K".format(self.impd.temperature))
+        if self.Tcont.temp != 'NA':
+            self.tempStatus.setText("{} K".format(self.Tcont.temp))
         else:
-            self.tempStatus.setText("{}".format(self.impd.temperature))
+            self.tempStatus.setText("{}".format(self.Tcont.temp))
         self.ACvoltStatus.setText("{} V".format(self.impd.Vac))
         self.DCvoltStatus.setText("{} V".format(self.impd.Vdc))
         
@@ -325,11 +325,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def finishAction(self):
         self.finished = True
+        self.FsweepRun = False
+        self.TFsweepRun = False
         self.stopProgram()
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
-        self.tSweepWorker = TemperatureSweepWorkerF(self.impd)
+        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.Tcont)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.finishAction)

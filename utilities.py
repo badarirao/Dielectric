@@ -21,6 +21,7 @@ from random import randint, uniform
 from time import sleep
 from PyQt5.QtCore import pyqtSignal
 from math import ceil
+from chino import ChinoKP1000C
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
@@ -115,13 +116,12 @@ class FakeImpd(FakeAdapter):
 
     """
 
-    def __init__(self, freq=1000, Vac=0.1, Vdc=0, temp='NA'):
+    def __init__(self, freq=1000, Vac=0.1, Vdc=0):
         super().__init__()
         self._freq = freq
         self.getFreqUnit()
         self.Vac = Vac
         self.Vdc = Vdc
-        self.temperature = temp
         self.sweepCount = 0
         self.startf = 20
         self.endf = 1e7
@@ -169,12 +169,14 @@ class FakeImpd(FakeAdapter):
         elif units == 2: # MHz
             return freq*1e6
         
-    def is_sweep_complete(self):
-        if self.sweepCount > 10:
-            return True
-        else:
-            self.sweepCount += 1
-            return False
+    def wait_to_complete(self,counts=10):
+        sweepCount = 0
+        while sweepCount <= counts :
+            sweepCount += 1
+            if self.stopCall == True:
+                self.impd.abort()
+                break
+            sleep(0.1)
     
     def start_fSweep(self):
         self.scannedFrequencies = get_frequencies_list(self.startf, self.endf, self.npointsf, self.sweeptypef)
@@ -257,8 +259,22 @@ def connectDevice(inst, addr, test=False):
             return 0, 0
 
 
-def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=None,
-                    test=False):
+def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=None, TControlAddr = None, test=False):
+    if E4990Addr:
+        try:
+            impd = KeysightE44990A(E4990Addr)
+        except:
+            impd = FakeImpd()
+    else:
+        impd = FakeImpd()
+    if TControlAddr:
+        try:
+            Tcont = ChinoKP1000C(TControlAddr)
+        except:
+            Tcont = FakeTempController()
+    else:
+        Tcont = FakeTempController()
+    return impd, Tcont
     """
     Obtain instrument address of K2450, K2700 and function generator.
 
@@ -268,6 +284,8 @@ def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=No
     if test is True,
         return FakeAdapter if any instrument is not found
     else exit program
+    """
+    
     """
     deviceAddr = [E4990Addr, k2700Addr, K195Addr, TR6845Addr]
     rm = ResourceManager()
@@ -322,7 +340,7 @@ def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=No
     if k2700.ID != 'Fake':
         k2700.write('DISPLAY:TEXT:STATE ON')
         k2700.write('DISPLAY:TEXT:DATA "KEYSIGHT USE"')
-    return E4990, k2700, K195, TR6845
+    """
 
 
 class IdleWorker(QObject):
@@ -399,15 +417,14 @@ class FrequencySweepWorker(QObject):
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        self.impd.display_on()
+        self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
         self.impd.start_fSweep()
         # TODO: Set the display on the instrument as desired
-        self.impd.sweepCount = 0
-        while not self.impd.is_sweep_complete():
-            if self.stopCall == True:
-                self.impd.abort()
-                break
-            sleep(0.1)
-        wholedata = self.impd.read_measurement_data()
+        self.impd.wait_to_complete()
+        measuredData = self.impd.read_measurement_data()
+        frequencyData = self.impd.get_frequencies()
+        wholedata = [frequencyData,measuredData]
         self.data.emit(wholedata)
         self.finished.emit()
 
