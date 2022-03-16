@@ -13,7 +13,7 @@ import sys
 from PyQt5 import QtWidgets, QtCore, QtGui
 from dielectric import Ui_ImpedanceApp
 from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
-from numpy import loadtxt
+from numpy import loadtxt, array, vstack, hstack
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
 from utilities import IdleWorker, FakeImpd, FrequencySweepWorker, TemperatureSweepWorkerF
@@ -206,6 +206,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.Vncycles.setEnabled(False)
     
     def continuousDisplay(self):
+        self.idleRun = True
         self.startIdleThread()
         self.showControllerStatus()
         
@@ -260,6 +261,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.FsweepRun = False
         self.TFsweepRun = False
         self.finished = False
+        self.idleRun = False
         if not self.fixFreq.isChecked():
             self.impd.startf = self.impd.get_absolute_frequency(self.startFreq.value(),self.startFreqUnit.currentIndex())
             self.impd.endf = self.impd.get_absolute_frequency(self.stopFreq.value(),self.stopFreqUnit.currentIndex())
@@ -285,6 +287,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fSweepWorker.data.connect(self.plotFsweepData)
         #self.thread.finished.connect(self.finishAction)
         self.freqthread.start()
+        self.initialize_frequencySweep_plot()
     
     def initialize_frequencySweep_plot(self,yaxis = 'z'):
         """
@@ -311,7 +314,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.addLegend()
         
     def plotFsweepData(self,data):
-        self.initialize_frequencySweep_plot()
         pen1 = mkPen('b', width=2)
         self.ImpdPlot.plot(data[0], data[1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
         
@@ -331,18 +333,57 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tSweepWorker.data.connect(self.plotTsweepData)
         #self.thread.finished.connect(self.finishAction)
         self.tempthreadf.start()
+        self.initialize_temperatureFSweep_plot()
+        self.TFplotinitial = True
+        
+    def initialize_temperatureFSweep_plot(self,yaxis = 'z'):
+        """
+        Initialize the plot to display temperature-frequency sweep.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.ImpdPlot.clear()
+        styles = {'color': 'r', 'font-size': '20px'}
+        if yaxis == 'z':
+            self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
+        elif yaxis == 'c':
+            self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
+        self.ImpdPlot.setLabel('bottom', 'Temperature', units = 'K', **styles)
+        tempAxis = self.ImpdPlot.plotItem.getAxis('bottom')
+        tempAxis.autoSIPrefix = False
+        self.ImpdPlot.addLegend()
         
     def plotTsweepData(self, data):
-        print(data[-1])
+        if self.TFplotinitial:
+            self.TFplotinitial = False
+            self.TFPlots = []
+            self.tempData = [data[-1]]
+            self.freqData = data[0]
+            self.zData = vstack(data[1])
+            for i,fdata in enumerate(self.freqData):
+                pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
+                self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], name="{} Hz".format(fdata), pen = pen1))
+        else:
+            self.tempData.append(data[-1])
+            self.zData = hstack((self.zData,vstack(data[1])))
+            for i in range(len(self.freqData)):
+                self.TFPlots[i].setData(self.tempData,self.zData[i])
         
     def stopProgram(self):
         if not self.finished:
             if self.TFsweepRun:
                 self.tSweepWorker.stopcall.emit()
+                self.TFsweepRun = False
             if self.FsweepRun:
                 self.fSweepWorker.stopcall.emit()
-        self.startIdleThread()
-        self.showControllerStatus()
+                self.FsweepRun = False
+        if not self.idleRun:
+            self.startIdleThread()
+            self.idleRun = True
+            self.showControllerStatus()
         self.statusBox.setEnabled(True)
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
@@ -350,6 +391,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def closeEvent(self, event):
         try:
             self.idleWorker.stopcall.emit()
+            self.idleRun = False
         except:
             pass
         quit_msg = "Are you sure you want to exit the program?"
@@ -364,8 +406,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             event.accept()
         else:
             event.ignore()
-            self.startIdleThread()
-            self.showControllerStatus()
+            self.continuousDisplay()
             
 def main():
     app = QtWidgets.QApplication(sys.argv)
