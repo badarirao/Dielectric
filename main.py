@@ -13,7 +13,7 @@ import sys
 from PyQt5 import QtWidgets, QtCore, QtGui
 from dielectric import Ui_ImpedanceApp
 from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
-from numpy import loadtxt, array, vstack, hstack
+from numpy import loadtxt, array, vstack, hstack, linspace
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
 from utilities import IdleWorker, FakeImpd, FrequencySweepWorker, TemperatureSweepWorkerF
@@ -43,6 +43,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.show()
         self.temperatures = []
         self.freqsweep = True
+        self.idleRun = False
+        self.TFsweepRun = False
+        self.FsweepRun = False
         self.lastfreqstate = 'sweep'
         self.impd = FakeImpd()
         self.stopButton.setEnabled(False)
@@ -126,9 +129,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.tempInterval.setEnabled(False)
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
-            #self.frame.hide()
+            self.frame.hide()
             self.loadTempButton.setEnabled(False)
-            #self.loadTempButton.hide()
+            self.loadTempButton.hide()
         else:
             self.fixedTemp.setEnabled(False)
             self.startTemp.setEnabled(True)
@@ -139,22 +142,25 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def measureModeSet(self):
         if self.measureMode.currentIndex() == 0:
             self.tempInterval.setEnabled(False)
-            #self.frame.hide()
+            self.frame.hide()
+            self.tempTraceback.show()
             self.loadTempButton.setEnabled(False)
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
-            #self.loadTempButton.hide()
+            self.loadTempButton.hide()
         elif self.measureMode.currentIndex() == 1:
-            #self.frame.show()
+            self.frame.show()
+            self.tempTraceback.show()
             self.measureLabel.setEnabled(True)
             self.tempInterval.setEnabled(True)
             self.degreesLabel.setEnabled(True)
             self.loadTempButton.setEnabled(False)
-            #self.loadTempButton.hide()
+            self.loadTempButton.hide()
         elif self.measureMode.currentIndex() == 2:
             self.tempInterval.setEnabled(False)
-            #self.frame.hide()
-            #self.loadTempButton.show()
+            self.frame.hide()
+            self.tempTraceback.hide()
+            self.loadTempButton.show()
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
             self.loadTempButton.setEnabled(True)
@@ -355,6 +361,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         tempAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         tempAxis.autoSIPrefix = False
         self.ImpdPlot.addLegend()
+        mintemp = min(self.startTemp.value(),self.stopTemp.value())
+        maxtemp = max(self.startTemp.value(),self.stopTemp.value())
+        self.ImpdPlot.setRange(xRange=(mintemp-20, maxtemp+20), padding=0)
         
     def plotTsweepData(self, data):
         if self.TFplotinitial:
@@ -363,13 +372,25 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.tempData = [data[-1]]
             self.freqData = data[0]
             self.zData = vstack(data[1])
+            l = len(self.freqData)
+            self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
             for i,fdata in enumerate(self.freqData):
                 pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
-                self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], name="{} Hz".format(fdata), pen = pen1))
+                if fdata < 1e3:
+                    freqlabel = "{} Hz".format(round(fdata,2))
+                elif 1e6 > fdata >= 1e3:
+                    freqlabel = "{} kHz".format(round(fdata/1e3,2))
+                elif fdata >= 1e6:
+                    freqlabel = "{} MHz".format(round(fdata/1e6,2))
+                self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], pen = pen1))
+                if i not in self.plotPoints:
+                    self.TFPlots[i].hide()
+                else:
+                    self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
         else:
             self.tempData.append(data[-1])
             self.zData = hstack((self.zData,vstack(data[1])))
-            for i in range(len(self.freqData)):
+            for i in self.plotPoints:
                 self.TFPlots[i].setData(self.tempData,self.zData[i])
         
     def stopProgram(self):
