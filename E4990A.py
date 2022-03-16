@@ -9,6 +9,7 @@ from pymeasure.instruments import Instrument
 from pymeasure.instruments.validators import strict_discrete_set, strict_range
 from pyvisa.errors import VisaIOError
 from time import sleep
+from random import randint, uniform
 
 """
 Important commands:
@@ -30,6 +31,7 @@ Required functions:
 class KeysightE44990A(Instrument):
     """Represents Impedance Analyzer E44990A"""
 
+    """
     ac_voltage = Instrument.control(":VOLT:LEV?", ":VOLT:LEV %g",
                                     "AC voltage level, in Volts",
                                     validator=strict_range,
@@ -52,8 +54,9 @@ class KeysightE44990A(Instrument):
         get_process=lambda x: x[:2])
 
     mode = Instrument.control("FUNCtion:IMPedance:TYPE?", "FUNCtion:IMPedance:TYPE %s",
-                              """
-Select quantities to be measured:
+    """
+    """
+    Select quantities to be measured:
     * CPD: Parallel capacitance [F] and dissipation factor [number]
     * CPQ: Parallel capacitance [F] and quality factor [number]
     * CPG: Parallel capacitance [F] and parallel conductance [S]
@@ -74,7 +77,7 @@ Select quantities to be measured:
     * GB: Conductance [S] and susceptance [S]
     * YTD: Admittance, magnitude [Ohm] and phase [deg]
     * YTR: Admittance magnitude [Ohm] and phase [rad]
-""",
+
                               validator=strict_discrete_set,
                               values=["CPD", "CPQ", "CPG", "CPRP",
                                       "CSD", "CSQ", "CSRS",
@@ -83,30 +86,48 @@ Select quantities to be measured:
                                       "RX", "ZTD", "ZTR", "GB", "YTD", "YTR", ])
 
     trigger_source = Instrument.control("TRIG:SOUR?", "TRIG:SOUR %s",
-                                        """
-Select trigger source; accept the values:
+                                        
+    Select trigger source; accept the values:
     * HOLD: manual
     * INT: internal
     * BUS: external bus (GPIB/LAN/USB)
-    * EXT: external connector""",
+    * EXT: external connector
                                         validator=strict_discrete_set,
                                         values=["HOLD", "INT", "BUS", "EXT"])
+    """
 
-    def __init__(self, adapter, **kwargs):
-        super().__init__(
-            adapter, "Agilent E4980A/AL LCR meter", **kwargs
-        )
+    def __init__(self, adapter, freq=1000, Vac=0.1, Vdc=0, temp='NA', **kwargs):
+        super().__init__(adapter, "Keysight E4990A Impedance Analyzer", timeout = 120000, **kwargs)
         self.timeout = 30000
-        # format: output ascii
-        self.write("FORM ASC")
+        self._freq = freq
+        self.getFreqUnit()
+        self.Vac = Vac
+        self.Vdc = Vdc
+        self.sweepCount = 0
+        self.startf = 20
+        self.endf = 1e7
+        self.npointsf = 50
+        self.sweeptypef = 1
 
+    def getFreqUnit(self):
+        if 20 <= self._freq < 1000:
+            self.freqUnit = 'Hz'
+            self.freq = self._freq
+        elif 1000 <= self._freq < 1000000:
+            self.freqUnit = 'kHz'
+            self.freq = self._freq/1000
+        elif self._freq >= 1000000:
+            self.freqUnit = 'MHz'
+            self.freq = self._freq/1000000
+
+    """    
     def freq_sweep(self, freq_list, return_freq=False):
-        """
-        Run frequency list sweep using sequential trigger.
-        :param freq_list: list of frequencies
-        :param return_freq: if True, returns the frequencies read from the instrument
-        Returns values as configured with :attr:`~.AgilentE4980.mode`
-            """
+        
+        #Run frequency list sweep using sequential trigger.
+        #:param freq_list: list of frequencies
+        #:param return_freq: if True, returns the frequencies read from the instrument
+        #Returns values as configured with :attr:`~.AgilentE4980.mode`
+            
         # manual, page 299
         # self.write("*RST;*CLS")
         self.write("TRIG:SOUR BUS")
@@ -137,7 +158,11 @@ Select trigger source; accept the values:
             return a_data, b_data, read_freqs
         else:
             return a_data, b_data
+    """
 
+    def close(self):
+        self.shutdown()
+    
     def continuous_measurement(self,continuous="ON"):
         """
         Syntax
@@ -240,7 +265,7 @@ Select trigger source; accept the values:
         """
         data = self.ask(":CALC1:DATA:FDAT?")
         data = data.split(',')
-        return [float(x) for x in data]
+        return [float(x) for i,x in enumerate(data) if i%2==0]
     
     def get_frequencies(self):
         """
@@ -273,7 +298,9 @@ Select trigger source; accept the values:
             DESCRIPTION.
 
         """
-        return self.ask(":SENS1:FREQ:DATA?")
+        freq = self.ask(":SENS1:FREQ:DATA?")
+        freq = freq.split(',')
+        return [float(x) for x in freq]
     
     def reset_to_default_continuous_measurement(self):
         """
@@ -675,7 +702,12 @@ Select trigger source; accept the values:
         self.write(":DISPlay:WINDow1:TRACe1:STATe OFF")
         self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
     
+    def display_on(self):
+        self.write(":DISPlay:WINDow1:TRACe1:STATe ON")
+        self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
+    
     def get_current_values(self):
+        """
         self.write(":Calculate1:Parameter1:Sel")
         z = self.ask(":Calculate1:Data:Fdat")
         z = z.split(',')
@@ -686,13 +718,29 @@ Select trigger source; accept the values:
         p = z.split(',')
         p = [float(x) for x in p]
         sleep(0.1)
+        return z,p
+        """
+        z = randint(1000, 10000)
+        p = randint(1, 100)
+        c = uniform(1e-7, 1e-12)
+        d = uniform(0, 1)
+        sleep(0.2)
+        return z, p, c, d
     
-    def is_sweep_complete(self):
+    def get_absolute_frequency(self, freq, units):
+        if units == 0: # Hz
+            return freq
+        elif units == 1: # kHz
+            return freq*1e3
+        elif units == 2: # MHz
+            return freq*1e6
+    
+    def wait_to_complete(self):
         ans = float(self.ask("*OPC?"))
-        if ans == 0:
-            return False
-        else:
+        if ans == 1:
             return True
+        else:
+            return False
     
     def start_fSweep(self):
         self.write(":TRIG:SINGLE")
