@@ -463,6 +463,7 @@ class TemperatureSweepWorkerF(QObject):
 
     def start_temperature_sweep(self):
         # TODO add option to set DC bias also
+        # TODO: the last temperature point is not being saved.
         self.impd.write(":INIT1:CONT ON")
         if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
@@ -490,12 +491,14 @@ class TemperatureSweepWorkerF(QObject):
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
-        if self.TCont.mode == 2:
+        if self.TCont.mode == 1:
             npoints = abs(int((self.TCont.startT-self.TCont.stopT)/self.TCont.interval))
             TempList = linspace(self.TCont.startT,self.TCont.stopT,npoints+1,dtype=int)
             if self.TCont.traceback == True:
                 TempList2 = linspace(self.TCont.stopT,self.TCont.startT,npoints+1,dtype=int)
                 TempList = concatenate(TempList,TempList2)
+            TempList = concatenate((TempList,[TempList[-1]]))
+            print(TempList)
             tcount = 0
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
@@ -511,6 +514,7 @@ class TemperatureSweepWorkerF(QObject):
                 else:
                     smallTemp = min(TempList[tcount],TempList[tcount+1])
                     largeTemp = max(TempList[tcount],TempList[tcount+1])
+                    print(smallTemp,sweepInitialTemperature,largeTemp)
                     if largeTemp >= sweepInitialTemperature >= smallTemp:
                         self.impd.start_fSweep()
                         self.impd.wait_to_complete()
@@ -522,10 +526,12 @@ class TemperatureSweepWorkerF(QObject):
                             self.TCont.abort()
                             self.data.emit([measuredData,averageTemperature])
                             break
+                    else:
+                        continue
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
                     self.freqSig.emit([frequencyData,measuredData,averageTemperature])
-                    self.TCont.tCount = 1
+                    self.TCont.tCount = 2
                 else:
                     self.data.emit([measuredData,averageTemperature])
                 if self.stopCall == True:

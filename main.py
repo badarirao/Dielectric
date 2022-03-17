@@ -41,6 +41,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tempTraceback.stateChanged.connect(self.updateTempTraceback)
         self.tempInterval.valueChanged.connect(self.updateTempInterval)
         self.stopHeater.clicked.connect(self.stop_Temperature_Controller)
+        self.measureMode.currentIndexChanged.connect(self.updateMeasureMode)
+        self.startTemp.valueChanged.connect(self.updateStartTemp)
+        self.stopTemp.valueChanged.connect(self.updateStopTemp)
+        self.heatRate.valueChanged.connect(self.updateRateTemp)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.setFixedTemperature.clicked.connect(self.setTemperature)
@@ -58,6 +62,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
         self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
@@ -68,6 +73,27 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         # TODO: Make a default temperature table, and load it in the beginning.
         """
     
+    def initializeParameters(self):
+        self.updateFixedDCVoltage()
+        self.updateACVoltage()
+        self.updateFixedTemperature()
+        self.updateFixedFrequency()
+        self.updateTempTraceback()
+        self.updateTempInterval()
+        self.updateMeasureMode()
+        self.updateStartTemp()
+        self.updateStopTemp()
+        self.updateRateTemp()
+    
+    def updateStartTemp(self):
+        self.TCont.startT = self.startTemp.value()
+    
+    def updateStopTemp(self):
+        self.TCont.stopT = self.stopTemp.value()
+    
+    def updateRateTemp(self):
+        self.TCont.rate = self.heatRate.value()
+        
     def updateFixedDCVoltage(self):
         self.impd.Vdc = self.fixedDCvolt.value()
         self.DCvoltStatus.setText("{} V".format(round(self.impd.Vdc,3)))
@@ -104,6 +130,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def updateTempInterval(self):
         self.TCont.interval = self.tempInterval.value()
+    
+    def updateMeasureMode(self):
+        self.TCont.mode = self.measureMode.currentIndex()
     
     def setTemperature(self):
         self.TCont.temp = self.fixedTemp.value()
