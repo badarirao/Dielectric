@@ -9,14 +9,14 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen
 self.ImpdPlot = PlotWidget(self.centralwidget,viewBox=ViewBox(border = mkPen(color='k',width = 2)))
 self.ImpdPlot.setBackground((255,182,193,25))
 """
-import sys
+import sys, os
 from PyQt5 import QtWidgets, QtCore, QtGui
 from dielectric import Ui_ImpedanceApp
 from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
-from numpy import loadtxt, array, vstack, hstack, linspace
+from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
-from utilities import IdleWorker, FrequencySweepWorker,\
+from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
 from time import sleep
 
@@ -40,6 +40,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
+        self.setFixedTemperature.clicked.connect(self.setTemperature)
+        self.saveDir.clicked.connect(self.chooseSaveDir)
+        self.filenameText.editingFinished.connect(self.setFileName)
+        self.setFileName(1)
         self.measureModeSet()
         self.show()
         self.temperatures = []
@@ -89,6 +93,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.impd.getFreqUnit()
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
     
+    def setTemperature(self):
+        pass
     
     def showTempTable(self):
         self.Form.show()
@@ -282,6 +288,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.FsweepRun = True
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked():
                 # TODO: add option for both heating and cooling option
+                self.filenameText.setEnabled(False)
+                #self.saveDir.setEnabled(False)
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
     
@@ -325,14 +333,79 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def plotFsweepData(self,data):
         pen1 = mkPen('b', width=2)
+        self.frequency_sweep_data = data
         self.ImpdPlot.plot(data[0], data[1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
         
+    def setFileName(self, initial = 0):
+        """
+        Autogenerate the filenames for various operations.
+
+            Generate only if changes to existing filename are made,
+            except when initial not equal to 0
+
+        Parameters
+        ----------
+        initial : int, optional
+            Set initial = 1 to generate the default names.
+            The default is 0.
+
+        Returns
+        -------
+        None.
+
+        """
+        if self.filenameText.isModified() or initial:
+            self.sampleID = get_valid_filename(self.filenameText.text())
+            if self.sampleID.find('.') != -1:
+                # rindex returns the last location of '.'
+                index = self.sampleID.rindex('.')
+                self.sampleID = self.sampleID[:index]
+            self.filenameText.setText(self.sampleID)
+            self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='txt')
+            self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
+        
+    def chooseSaveDir(self):
+        """
+        Open the dialog for selecting directory.
+
+        Returns
+        -------
+        None.
+
+        """
+        options = QtWidgets.QFileDialog()
+        options.setFileMode(QtWidgets.QFileDialog.Directory)
+        options.setDirectory(os.getcwd())
+        dirName = options.getExistingDirectory()
+        if dirName:
+            os.chdir(dirName)
+            self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='txt')
+            self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
+        
     def finishAction(self):
+        
+        # Save the data
+        if self.FsweepRun:
+            with open(self.sampleID_fSweep, 'w') as f:
+                try:
+                    temperature = self.TCont.temp
+                except:
+                    temperature = 'NA'
+                f.write("AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K\n\n".format(self.impd.Vac, self.impd.Vdc, temperature))
+                f.write("Frequency (Hz)\n")
+                for row in range(len(self.frequency_sweep_data[0])):
+                    line = []
+                    for column in range(len(self.frequency_sweep_data)):
+                        line.append(str(self.frequency_sweep_data[column][row]))
+                    for word in line:
+                        f.write(word + '\t')
+                    f.write('\n')
+        elif self.TFsweepRun:
+            self.filenameText.setEnabled(True)
+            #self.saveDir.setEnabled(True)
         self.finished = True
         self.FsweepRun = False
         self.TFsweepRun = False
-        # Save the data
-        fname = self.filenameText.text()
         self.stopProgram()
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
@@ -390,12 +463,24 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.TFPlots[i].hide()
             else:
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
+        with open(self.sampleID_tSweepF, 'w') as f:
+            f.write("AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
+            f.write("Temperature (K)")
+            for freq in self.freqData:
+                f.write('\t' + str(freq))
+            f.write('\n')
         
     def plotTsweepData(self, data):
         self.tempData.append(data[-1])
         self.zData = hstack((self.zData,vstack(data[0])))
         for i in self.plotPoints:
             self.TFPlots[i].setData(self.tempData,self.zData[i])
+        line = array((data[0]))
+        line = concatenate(([data[-1]],line))
+        line = hstack(line)
+        # TODO: it is not saving in single line
+        with open(self.sampleID_tSweepF, 'a') as f:
+            savetxt(f,line,delimiter='\t',fmt='%g')
         
     def stopProgram(self):
         if not self.finished:
