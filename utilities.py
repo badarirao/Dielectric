@@ -13,7 +13,7 @@ from re import sub
 from PyQt5.QtCore import QObject, QTimer, QEventLoop, pyqtSignal
 from PyQt5.QtWidgets import QTimeEdit, QSpinBox
 from math import log10
-from numpy import logspace, linspace, diff, array, append
+from numpy import logspace, linspace, diff, array, append, concatenate
 from time import sleep
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
@@ -86,6 +86,8 @@ class FakeTempController(FakeAdapter):
         self.rate = -1 # degreee per minute
         self.mode = 0
         self.tCount = 0
+        self.traceback = False
+        self.interval = 1
     
     @property
     def temp(self):
@@ -488,16 +490,38 @@ class TemperatureSweepWorkerF(QObject):
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
-        if self.TCont.mode == 0:
+        if self.TCont.mode == 2:
+            npoints = abs(int((self.TCont.startT-self.TCont.stopT)/self.TCont.interval))
+            TempList = linspace(self.TCont.startT,self.TCont.stopT,npoints+1,dtype=int)
+            if self.TCont.traceback == True:
+                TempList2 = linspace(self.TCont.stopT,self.TCont.startT,npoints+1,dtype=int)
+                TempList = concatenate(TempList,TempList2)
+            tcount = 0
+        if self.TCont.mode in (0,1):
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
             while self.TCont.isRunning():
                 sweepInitialTemperature = self.TCont.temp
-                self.impd.start_fSweep()
-                self.impd.wait_to_complete()
-                measuredData = self.impd.read_measurement_data()
-                sweepFinalTemperature = self.TCont.temp
-                averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                if self.TCont.mode == 0:
+                    self.impd.start_fSweep()
+                    self.impd.wait_to_complete()
+                    measuredData = self.impd.read_measurement_data()
+                    sweepFinalTemperature = self.TCont.temp
+                    averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                else:
+                    smallTemp = min(TempList[tcount],TempList[tcount+1])
+                    largeTemp = max(TempList[tcount],TempList[tcount+1])
+                    if largeTemp >= sweepInitialTemperature >= smallTemp:
+                        self.impd.start_fSweep()
+                        self.impd.wait_to_complete()
+                        measuredData = self.impd.read_measurement_data()
+                        sweepFinalTemperature = self.TCont.temp
+                        averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                        tcount += 1
+                        if tcount+1 >= len(TempList):
+                            self.TCont.abort()
+                            self.data.emit([measuredData,averageTemperature])
+                            break
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
                     self.freqSig.emit([frequencyData,measuredData,averageTemperature])

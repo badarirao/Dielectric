@@ -50,6 +50,7 @@ class ChinoKP1000C(object):
         self.mode = 0
         self.tCount = 0
         self.traceback = False
+        self.interval = 1
 
     def read_param(self, param):
         self.write_param(param)
@@ -171,9 +172,9 @@ class ChinoKP1000C(object):
         # abort pattern 1
         self.write_param(' 2, 1, 2, 01,')
         
-        # the command below will reset
-        #self.write_param(' 2, 1, 4, 01,')
-        
+    def reset(self):
+        self.write_param(' 2, 1, 4, 01,')
+    
     def isRunning(self):
         #TODO: verify the value stored in self.status
         self.read_data_request()

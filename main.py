@@ -38,6 +38,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
         self.fixedACvolt.valueChanged.connect(self.updateACVoltage)
         self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
+        self.tempTraceback.stateChanged.connect(self.updateTempTraceback)
+        self.tempInterval.valueChanged.connect(self.updateTempInterval)
+        self.stopHeater.clicked.connect(self.stop_Temperature_Controller)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.setFixedTemperature.clicked.connect(self.setTemperature)
@@ -93,9 +96,21 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.impd.getFreqUnit()
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
     
-    def setTemperature(self):
-        pass
+    def updateTempTraceback(self):
+        if self.tempTraceback.isChecked():
+            self.TCont.traceback = True
+        else:
+            self.TCont.traceback = False
     
+    def updateTempInterval(self):
+        self.TCont.interval = self.tempInterval.value()
+    
+    def setTemperature(self):
+        self.TCont.temp = self.fixedTemp.value()
+    
+    def stop_Temperature_Controller(self):
+        self.TCont.reset()
+        
     def showTempTable(self):
         self.Form.show()
         
