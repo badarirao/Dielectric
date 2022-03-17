@@ -465,14 +465,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.zData = vstack(fdata[1])
         l = len(self.freqData)
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
-        for i,fdata in enumerate(self.freqData):
+        for i,Fdata in enumerate(self.freqData):
             pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
-            if fdata < 1e3:
-                freqlabel = "{} Hz".format(round(fdata,2))
-            elif 1e6 > fdata >= 1e3:
-                freqlabel = "{} kHz".format(round(fdata/1e3,2))
-            elif fdata >= 1e6:
-                freqlabel = "{} MHz".format(round(fdata/1e6,2))
+            if Fdata < 1e3:
+                freqlabel = "{} Hz".format(round(Fdata,2))
+            elif 1e6 > Fdata >= 1e3:
+                freqlabel = "{} kHz".format(round(Fdata/1e3,2))
+            elif Fdata >= 1e6:
+                freqlabel = "{} MHz".format(round(Fdata/1e6,2))
             self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], pen = pen1))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
@@ -482,7 +482,17 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             f.write("AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
             f.write("Temperature (K)")
             for freq in self.freqData:
-                f.write('\t' + str(freq))
+                if freq<1e3:
+                    text = '\t{:.2f}Hz'.format(freq)
+                elif 1e3 <= freq < 1e6:
+                    text = '\t{:.2f}kHz'.format(freq/1e3)
+                elif freq >= 1e6:
+                    text = '\t{:.2f}MHz'.format(freq/1e6)
+                f.write(text)
+            f.write('\n')
+            line = array((fdata[1]))
+            line = concatenate(([fdata[-1]],line))
+            savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
             f.write('\n')
         
     def plotTsweepData(self, data):
@@ -492,10 +502,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.TFPlots[i].setData(self.tempData,self.zData[i])
         line = array((data[0]))
         line = concatenate(([data[-1]],line))
-        line = hstack(line)
-        # TODO: it is not saving in single line
         with open(self.sampleID_tSweepF, 'a') as f:
-            savetxt(f,line,delimiter='\t',fmt='%g')
+            savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
+            f.write('\n')
         
     def stopProgram(self):
         if not self.finished:
