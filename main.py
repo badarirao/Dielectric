@@ -16,7 +16,8 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
 from numpy import loadtxt, array, vstack, hstack, linspace
 from templist import Ui_Form
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
-from utilities import IdleWorker, FakeImpd, FrequencySweepWorker, TemperatureSweepWorkerF, checkInstrument
+from utilities import IdleWorker, FrequencySweepWorker,\
+                    unique_filename, TemperatureSweepWorkerF, checkInstrument
 from time import sleep
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
@@ -47,7 +48,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.TFsweepRun = False
         self.FsweepRun = False
         self.lastfreqstate = 'sweep'
-        self.impd, self.Tcont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        self.yaxis = 'z'
+        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.stopButton.setEnabled(False)
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
@@ -67,9 +70,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
         
     def updateFixedTemperature(self):
-        self.Tcont.temp = self.fixedTemp.value()
-        # TODO: change it to actual temperature (currently showing set temperature)
-        self.tempStatus.setText("{}".format(round(self.Tcont.temp,2)))
+        self.TCont.temp = self.fixedTemp.value()
+        self.TCont.real_data_request()
+        self.tempStatus.setText("{}".format(round(self.TCont.temp,2)))
         
     def updateFixedFrequency(self):
         multiply = 1
@@ -230,10 +233,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def showControllerStatus(self):
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
-        if self.Tcont.temp != 'NA':
-            self.tempStatus.setText("{} K".format(self.Tcont.temp))
+        self.TCont.real_data_request()
+        if self.TCont.temp != -1:
+            self.tempStatus.setText("{} K".format(self.TCont.temp))
         else:
-            self.tempStatus.setText("{}".format(self.Tcont.temp))
+            self.tempStatus.setText("NA")
         self.ACvoltStatus.setText("{} V".format(self.impd.Vac))
         self.DCvoltStatus.setText("{} V".format(self.impd.Vdc))
         
@@ -327,11 +331,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.finished = True
         self.FsweepRun = False
         self.TFsweepRun = False
+        # Save the data
+        fname = self.filenameText.text()
         self.stopProgram()
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
-        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.Tcont)
+        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.TCont)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.finishAction)
@@ -339,12 +345,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tSweepWorker.finished.connect(self.tSweepWorker.deleteLater)
         self.tempthreadf.finished.connect(self.tempthreadf.deleteLater)
         self.tSweepWorker.data.connect(self.plotTsweepData)
+        self.tSweepWorker.freqSig.connect(self.initialize_temperatureFSweep_plot)
         #self.thread.finished.connect(self.finishAction)
         self.tempthreadf.start()
-        self.initialize_temperatureFSweep_plot()
-        self.TFplotinitial = True
         
-    def initialize_temperatureFSweep_plot(self,yaxis = 'z'):
+    def initialize_temperatureFSweep_plot(self,fdata):
         """
         Initialize the plot to display temperature-frequency sweep.
 
@@ -355,9 +360,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         """
         self.ImpdPlot.clear()
         styles = {'color': 'r', 'font-size': '20px'}
-        if yaxis == 'z':
+        if self.yaxis == 'z':
             self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
-        elif yaxis == 'c':
+        elif self.yaxis == 'c':
             self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
         self.ImpdPlot.setLabel('bottom', 'Temperature', units = 'K', **styles)
         tempAxis = self.ImpdPlot.plotItem.getAxis('bottom')
@@ -366,34 +371,31 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         mintemp = min(self.startTemp.value(),self.stopTemp.value())
         maxtemp = max(self.startTemp.value(),self.stopTemp.value())
         self.ImpdPlot.setRange(xRange=(mintemp-20, maxtemp+20), padding=0)
+        self.TFPlots = []
+        self.tempData = [fdata[-1]]
+        self.freqData = fdata[0]
+        self.zData = vstack(fdata[1])
+        l = len(self.freqData)
+        self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
+        for i,fdata in enumerate(self.freqData):
+            pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
+            if fdata < 1e3:
+                freqlabel = "{} Hz".format(round(fdata,2))
+            elif 1e6 > fdata >= 1e3:
+                freqlabel = "{} kHz".format(round(fdata/1e3,2))
+            elif fdata >= 1e6:
+                freqlabel = "{} MHz".format(round(fdata/1e6,2))
+            self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], pen = pen1))
+            if i not in self.plotPoints:
+                self.TFPlots[i].hide()
+            else:
+                self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
         
     def plotTsweepData(self, data):
-        if self.TFplotinitial:
-            self.TFplotinitial = False
-            self.TFPlots = []
-            self.tempData = [data[-1]]
-            self.freqData = data[0]
-            self.zData = vstack(data[1])
-            l = len(self.freqData)
-            self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
-            for i,fdata in enumerate(self.freqData):
-                pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
-                if fdata < 1e3:
-                    freqlabel = "{} Hz".format(round(fdata,2))
-                elif 1e6 > fdata >= 1e3:
-                    freqlabel = "{} kHz".format(round(fdata/1e3,2))
-                elif fdata >= 1e6:
-                    freqlabel = "{} MHz".format(round(fdata/1e6,2))
-                self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], pen = pen1))
-                if i not in self.plotPoints:
-                    self.TFPlots[i].hide()
-                else:
-                    self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
-        else:
-            self.tempData.append(data[-1])
-            self.zData = hstack((self.zData,vstack(data[1])))
-            for i in self.plotPoints:
-                self.TFPlots[i].setData(self.tempData,self.zData[i])
+        self.tempData.append(data[-1])
+        self.zData = hstack((self.zData,vstack(data[0])))
+        for i in self.plotPoints:
+            self.TFPlots[i].setData(self.tempData,self.zData[i])
         
     def stopProgram(self):
         if not self.finished:

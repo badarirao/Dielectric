@@ -104,7 +104,8 @@ class FakeTempController(FakeAdapter):
     
     def isRunning(self):
         self.temp = self.templist[self.tCount]
-        self.tCount += 1
+        if self.tCount > 0:
+            self.tCount += 1
         if self.tCount >= len(self.templist):
             return False
         return True
@@ -127,6 +128,7 @@ class FakeImpd(FakeAdapter):
         self.endf = 1e7
         self.npointsf = 50
         self.sweeptypef = 1
+        self.stopCall = False
 
     def getFreqUnit(self):
         if 20 <= self._freq < 1000:
@@ -171,10 +173,11 @@ class FakeImpd(FakeAdapter):
         
     def wait_to_complete(self,counts=10):
         sweepCount = 0
+        self.stopCall = False
         while sweepCount <= counts :
             sweepCount += 1
             if self.stopCall == True:
-                self.impd.abort()
+                self.abort()
                 break
             sleep(0.1)
     
@@ -195,7 +198,10 @@ class FakeImpd(FakeAdapter):
             self.dArray.append(d)
     
     def read_measurement_data(self):
-        return [self.scannedFrequencies,self.zArray]
+        return self.zArray
+    
+    def get_frequencies(self):
+        return self.scannedFrequencies
 
 def get_linlog_segment_list(start, end, npoints):
     if start < 20:
@@ -431,6 +437,7 @@ class FrequencySweepWorker(QObject):
 class TemperatureSweepWorkerF(QObject):
     finished = pyqtSignal()
     data = pyqtSignal(list)
+    freqSig = pyqtSignal(list)
     stopcall = pyqtSignal()
 
     def __init__(self, impd=None, TCont = None):
@@ -441,20 +448,25 @@ class TemperatureSweepWorkerF(QObject):
             self.impd = FakeImpd()
         if self.TCont == None:
             self.TCont = FakeTempController()
+        self.start = self.impd.startf
+        self.end = self.impd.endf
+        self.npoints = self.impd.npointsf
+        self.spacing = self.impd.sweeptypef
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
 
     def stopcalled(self):
         self.stopCall = True
+        self.impd.stopCall = True
 
     def start_temperature_sweep(self):
         # TODO add option to set DC bias also
         self.impd.write(":INIT1:CONT ON")
-        if self.impd.sweeptypef == 0:   # set sweep type
+        if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
-        elif self.impd.sweeptypef == 1:
+        elif self.spacing == 1:
             self.impd.write(":SENS1:SWE:TYPE LOG") 
-        elif self.impd.sweeptypef == 2:
+        elif self.spacing == 2:
             segments = get_linlog_segment_list(self.impd.startf, self.impd.endf, self.impd.npointsf)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
@@ -467,27 +479,31 @@ class TemperatureSweepWorkerF(QObject):
                 segCommand += ',' + seg
             self.impd.write(":SENS1:SWE:TYPE LIN") 
             self.impd.write(":SENS1:SEGM:DATA {}".format(segCommand)) 
-        if self.impd.sweeptypef != 2:
+        if self.spacing != 2:
             self.impd.write(":SENS1:SWE:POIN {}".format(self.impd.npointsf+1)) # set number of points
             self.impd.write(":SENS1:FREQ:STAR {}".format(self.impd.startf)) # set start frequency
             self.impd.write(":SENS1:FREQ:STOP {}".format(self.impd.endf)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        self.impd.display_on()
+        self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
         if self.TCont.mode == 0:
             self.TCont.rampT()
-            self.TCont.tCount = 0
+            self.TCont.tCount = 0 # required for Fake temperature controller
             while self.TCont.isRunning():
+                sweepInitialTemperature = self.TCont.temp
                 self.impd.start_fSweep()
-                # TODO: Set the display on the instrument as desired
-                self.impd.sweepCount = 0
-                while not self.impd.is_sweep_complete():
-                    if self.stopCall == True:
-                        self.impd.abort()
-                    sleep(0.1)
-                wholedata = self.impd.read_measurement_data()
-                wholedata.append(self.TCont.temp)
-                self.data.emit(wholedata)
+                self.impd.wait_to_complete()
+                measuredData = self.impd.read_measurement_data()
+                sweepFinalTemperature = self.TCont.temp
+                averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                if self.TCont.tCount == 0: # Include frequency data initially
+                    frequencyData = self.impd.get_frequencies()
+                    self.freqSig.emit([frequencyData,measuredData,averageTemperature])
+                    self.TCont.tCount = 1
+                else:
+                    self.data.emit([measuredData,averageTemperature])
                 if self.stopCall == True:
                     self.TCont.abort()
                     break
@@ -543,3 +559,29 @@ def get_frequencies_list(start, end, npoints, spacing):
                 linspace(lin_ranges[i], lin_ranges[i+1], points_per_order[i], endpoint=False)))
         frequencies.append(end)
     return frequencies
+
+def unique_filename(directory, prefix='DATA', suffix='', ext='csv',
+                    dated_folder=False, index=True, datetimeformat="%Y-%m-%d"):
+    """
+    Return a unique filename based on the directory and prefix.
+    Note: adopted from Pymeasure Package.
+    """
+    now = datetime.now()
+    directory = abspath(directory)
+    if dated_folder:
+        directory = join(directory, now.strftime('%Y-%m-%d'))
+    if not exists(directory):
+        makedirs(directory)
+    if index:
+        i = 1
+        basename = "%s%s" % (prefix, now.strftime(datetimeformat))
+        basepath = join(directory, basename)
+        filename = "%s_%d%s.%s" % (basepath, i, suffix, ext)
+        while exists(filename):
+            i += 1
+            filename = "%s_%d%s.%s" % (basepath, i, suffix, ext)
+    else:
+        basename = "%s%s%s.%s" % (
+            prefix, now.strftime(datetimeformat), suffix, ext)
+        filename = join(directory, basename)
+    return filename

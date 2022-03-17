@@ -115,3 +115,6 @@ dmypy.json
 
 # design file
 *.ui
+
+# pdf files
+*.pdf
