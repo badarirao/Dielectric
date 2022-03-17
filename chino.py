@@ -30,7 +30,7 @@ def checksum(message):
 
 
 class ChinoKP1000C(object):
-    def __init__(self, serial_device, baudrate=19200, temp=300):
+    def __init__(self, serial_device, baudrate=19200, temp=-1):
         self.device = device_address
         # timeout: 110 ms to get all answers.
         self.s = serial.Serial(serial_device,
@@ -51,6 +51,7 @@ class ChinoKP1000C(object):
         self.tCount = 0
         self.traceback = False
         self.interval = 1
+        self.real_data_request()
 
     def read_param(self, param):
         self.write_param(param)
@@ -107,8 +108,8 @@ class ChinoKP1000C(object):
         self.time = temp[8].replace(" ", "")  # hours/minutes
         self.status = int(temp[9].replace(" ", ""))
         self.MV1 = float(temp[10].replace(" ", ""))
-        
         self._temp = self.PV
+        # TODO: if self.PV is showing out of range, then set self._temp = -1
 
     def get_current_temperature(self):
         self.real_data_request()

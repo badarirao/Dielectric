@@ -108,7 +108,24 @@ class KeysightE44990A(Instrument):
         self.endf = 1e7
         self.npointsf = 50
         self.sweeptypef = 1
+        # set oscillating mode as voltage
+        self.write(":SOUR1:MODE VOLT")
+        # set DC Bias mode as voltage
+        self.write(":SOUR1:BIAS:MODE VOLT")
 
+    def enable_DC_Bias(self,ans=True):
+        if ans == True:
+            self.write(":SOUR:BIAS:STAT ON")
+        else:
+            self.write(":SOUR:BIAS:STAT OFF")
+    
+    def is_BIAS_ON(self):
+        ans = float(self.ask(":SOUR:BIAS:STAT?"))
+        if ans:
+            return True
+        else:
+            return False
+        
     def getFreqUnit(self):
         if 20 <= self._freq < 1000:
             self.freqUnit = 'Hz'
@@ -484,7 +501,7 @@ class KeysightE44990A(Instrument):
         """
         self.write(":DISP:WIND1:TRAC1:Y:SPAC LOG")
     
-    def fix_frequency(self,freq):
+    def fix_frequency(self):
         """
         Description
         This command sets/gets the continuous wave frequency.
@@ -533,8 +550,12 @@ class KeysightE44990A(Instrument):
         None.
 
         """
-        self.write(":SENS1:FREQ:CW {}".format(freq))
+        self.write(":SENS1:FREQ {}".format(self._freq))
     
+    def get_fixedFrequency(self):
+        freq = float(self.ask(":SENS1:FREQ?"))
+        return freq
+        
     def select_voltage_source(self):
         """
         Description
@@ -744,5 +765,11 @@ class KeysightE44990A(Instrument):
     
     def start_fSweep(self):
         self.write(":TRIG:SINGLE")
+    
+    def setVac(self):
+        self.write(":SOUR1:VOLT {}".format(self.Vac))
+    
+    def setVdc(self):
+        self.write(":SOUR1:BIAS:VOLT {}".format(self.Vdc))
         
         

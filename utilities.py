@@ -103,13 +103,16 @@ class FakeTempController(FakeAdapter):
         total_time = abs((self.startT-self.stopT)/self.rate) # minutes
         tpoints = int(total_time/fsweeptime)
         self.templist = linspace(self.startT,self.stopT,tpoints+1)
+        if self.traceback == True:
+            templist2 = linspace(self.stopT,self.startT,tpoints+1)
+            self.templist = concatenate((self.templist,templist2))
     
     def isRunning(self):
+        if self.tCount >= len(self.templist):
+            return False
         self.temp = self.templist[self.tCount]
         if self.tCount > 0:
             self.tCount += 1
-        if self.tCount >= len(self.templist):
-            return False
         return True
     
 class FakeImpd(FakeAdapter):
@@ -409,9 +412,15 @@ class FrequencySweepWorker(QObject):
             segments = get_linlog_segment_list(self.start, self.end, self.npoints)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
-            segmentFormat =  "7,0,1,0,0,0,0,0,{}".format(len(segments))
+            if self.impd.Vdc:
+                bias = 1
+            else:
+                bias = 0
+            segmentFormat =  "7,0,1,{0},0,0,0,0,{1}".format(bias,len(segments))
             for seg in segments:
                 seg.extend(["0","{}".format(self.impd.Vac)])
+                if bias:
+                    seg.extend([",0","{}".format(self.impd.Vdc)])
                 Segments.append(','.join([str(s) for s in seg]))
             segCommand = segmentFormat
             for seg in Segments:
@@ -424,6 +433,10 @@ class FrequencySweepWorker(QObject):
             self.impd.write(":SENS1:FREQ:STOP {}".format(self.end)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+            if self.impd.Vdc:
+                if not self.impd.is_BIAS_ON():
+                    self.impd.enable_DC_Bias(True)
+                self.impd.setVdc()
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
@@ -473,9 +486,15 @@ class TemperatureSweepWorkerF(QObject):
             segments = get_linlog_segment_list(self.impd.startf, self.impd.endf, self.impd.npointsf)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
-            segmentFormat =  "7,0,1,0,0,0,0,0,{}".format(len(segments))
+            if self.impd.Vdc:
+                bias = 1
+            else:
+                bias = 0
+            segmentFormat =  "7,0,1,{0},0,0,0,0,{1}".format(bias,len(segments))
             for seg in segments:
                 seg.extend(["0","{}".format(self.impd.Vac)])
+                if bias:
+                    seg.extend([",0","{}".format(self.impd.Vdc)])
                 Segments.append(','.join([str(s) for s in seg]))
             segCommand = segmentFormat
             for seg in Segments:
@@ -488,6 +507,10 @@ class TemperatureSweepWorkerF(QObject):
             self.impd.write(":SENS1:FREQ:STOP {}".format(self.impd.endf)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+            if self.impd.Vdc:
+                if not self.impd.is_BIAS_ON():
+                    self.impd.enable_DC_Bias(True)
+                self.impd.setVdc()
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
@@ -496,9 +519,8 @@ class TemperatureSweepWorkerF(QObject):
             TempList = linspace(self.TCont.startT,self.TCont.stopT,npoints+1,dtype=int)
             if self.TCont.traceback == True:
                 TempList2 = linspace(self.TCont.stopT,self.TCont.startT,npoints+1,dtype=int)
-                TempList = concatenate(TempList,TempList2)
+                TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
-            print(TempList)
             tcount = 0
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
@@ -514,7 +536,6 @@ class TemperatureSweepWorkerF(QObject):
                 else:
                     smallTemp = min(TempList[tcount],TempList[tcount+1])
                     largeTemp = max(TempList[tcount],TempList[tcount+1])
-                    print(smallTemp,sweepInitialTemperature,largeTemp)
                     if largeTemp >= sweepInitialTemperature >= smallTemp:
                         self.impd.start_fSweep()
                         self.impd.wait_to_complete()
@@ -531,7 +552,7 @@ class TemperatureSweepWorkerF(QObject):
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
                     self.freqSig.emit([frequencyData,measuredData,averageTemperature])
-                    self.TCont.tCount = 2
+                    self.TCont.tCount += 1
                 else:
                     self.data.emit([measuredData,averageTemperature])
                 if self.stopCall == True:

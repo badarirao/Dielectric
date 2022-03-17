@@ -35,6 +35,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.loadTempButton.clicked.connect(self.loadTemperatures)
         self.fixedFreq.valueChanged.connect(self.updateFixedFrequency)
         self.fixedFreqUnit.currentIndexChanged.connect(self.updateFixedFrequency)
+        self.startFreq.valueChanged.connect(self.updateStartFrequency)
+        self.startFreqUnit.currentIndexChanged.connect(self.updateStartFrequency)
+        self.stopFreq.valueChanged.connect(self.updateStopFrequency)
+        self.stopFreqUnit.currentIndexChanged.connect(self.updateStopFrequency)
         self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
         self.fixedACvolt.valueChanged.connect(self.updateACVoltage)
         self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
@@ -48,10 +52,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.setFixedTemperature.clicked.connect(self.setTemperature)
+        self.setFixedACV.clicked.connect(self.setACVolts)
+        self.setFixedDCV.clicked.connect(self.setDCVolts)
         self.saveDir.clicked.connect(self.chooseSaveDir)
         self.filenameText.editingFinished.connect(self.setFileName)
         self.setFileName(1)
         self.measureModeSet()
+        self.tempOption()
         self.show()
         self.temperatures = []
         self.freqsweep = True
@@ -96,30 +103,53 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def updateFixedDCVoltage(self):
         self.impd.Vdc = self.fixedDCvolt.value()
-        self.DCvoltStatus.setText("{} V".format(round(self.impd.Vdc,3)))
         
     def updateACVoltage(self):
         self.impd.Vac = self.fixedACvolt.value()
-        self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
         
     def updateFixedTemperature(self):
-        self.TCont.temp = self.fixedTemp.value()
-        self.TCont.real_data_request()
-        self.tempStatus.setText("{}".format(round(self.TCont.temp,2)))
+        pass
+        #self.TCont.temp = self.fixedTemp.value()
         
+    def updateStartFrequency(self):
+        multiply = 1
+        if self.startFreqUnit.currentIndex() == 0:
+            self.startFreq.setMinimum(20)
+        elif self.startFreqUnit.currentIndex() == 1:
+            self.startFreq.setMinimum(1)
+            multiply = 1000
+        elif self.startFreqUnit.currentIndex() == 2:
+            self.startFreq.setMinimum(1)
+            multiply = 1000000
+        self.startFreq.setMaximum(10000000/multiply)
+    
+    def updateStopFrequency(self):
+        multiply = 1
+        if self.stopFreqUnit.currentIndex() == 0:
+            self.stopFreq.setMinimum(20)
+        elif self.stopFreqUnit.currentIndex() == 1:
+            self.stopFreq.setMinimum(1)
+            multiply = 1000
+        elif self.stopFreqUnit.currentIndex() == 2:
+            self.stopFreq.setMinimum(1)
+            multiply = 1000000
+        self.stopFreq.setMaximum(10000000/multiply)
+    
     def updateFixedFrequency(self):
         multiply = 1
         if self.fixedFreqUnit.currentIndex() == 0:
             self.fixedFreq.setMinimum(20)
         elif self.fixedFreqUnit.currentIndex() == 1:
-            self.fixedFreq.setMinimum(0)
+            self.fixedFreq.setMinimum(1)
             multiply = 1000
         elif self.fixedFreqUnit.currentIndex() == 2:
-            self.fixedFreq.setMinimum(0)
+            self.fixedFreq.setMinimum(1)
             multiply = 1000000
         self.impd._freq = self.fixedFreq.value()*multiply
+        self.impd.fix_frequency()
         self.fixedFreq.setMaximum(10000000/multiply)
         self.impd.getFreqUnit()
+        #TODO maybe show the frequency returned by the instrument?
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
     
     def updateTempTraceback(self):
@@ -136,6 +166,20 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def setTemperature(self):
         self.TCont.temp = self.fixedTemp.value()
+        #self.tempStatus.setText("{} K".format(round(self.TCont.temp,2)))
+    
+    def setACVolts(self):
+        self.impd.setVac()
+        self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
+    
+    def setDCVolts(self):
+        if self.impd.Vdc != 0 :
+            self.impd.enable_DC_Bias(True)
+            self.impd.setVdc()
+        else:
+            self.impd.setVdc()
+            self.impd.enable_DC_Bias(False)
+        self.DCvoltStatus.setText("{} V".format(round(self.impd.Vdc,3)))
     
     def stop_Temperature_Controller(self):
         self.TCont.reset()
@@ -176,20 +220,26 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def tempOption(self):
         if self.fixTemp.isChecked() == True:
             self.fixedTemp.setEnabled(True)
+            self.setFixedTemperature.setEnabled(True)
             self.startTemp.setEnabled(False)
             self.stopTemp.setEnabled(False)
             self.measureMode.setEnabled(False)
             self.tempInterval.setEnabled(False)
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
+            self.heatRate.setEnabled(False)
+            self.tempTraceback.setEnabled(False)
             self.frame.hide()
             self.loadTempButton.setEnabled(False)
             self.loadTempButton.hide()
         else:
             self.fixedTemp.setEnabled(False)
+            self.setFixedTemperature.setEnabled(False)
             self.startTemp.setEnabled(True)
             self.stopTemp.setEnabled(True)
+            self.heatRate.setEnabled(True)
             self.measureMode.setEnabled(True)
+            self.tempTraceback.setEnabled(True)
             self.measureModeSet()
     
     def measureModeSet(self):
@@ -224,6 +274,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.fixFreq.setChecked(False)
                 self.freqOption()
             self.fixedDCvolt.setEnabled(True)
+            self.setFixedDCV.setEnabled(True)
             self.startVoltageLabel.setEnabled(False)
             self.startVoltage.setEnabled(False)
             self.stopVoltageLabel.setEnabled(False)
@@ -239,6 +290,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             else:
                 self.lastfreqstate = 'fix'
             self.fixedDCvolt.setEnabled(False)
+            self.setFixedDCV.setEnabled(False)
             self.startVoltageLabel.setEnabled(True)
             self.startVoltage.setEnabled(True)
             self.stopVoltageLabel.setEnabled(True)
@@ -265,9 +317,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.Vncycles.setEnabled(False)
     
     def continuousDisplay(self):
-        self.idleRun = True
-        self.startIdleThread()
-        self.showControllerStatus()
+        if not self.idleRun:
+            self.idleRun = True
+            self.startIdleThread()
+            self.showControllerStatus()
         
     def startIdleThread(self):
         self.idlethread = QThread()
@@ -311,6 +364,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             capacitance*=1e12
         self.capStatus.setText("{0} {1}".format(round(capacitance,3), capUnit))
         self.tandStatus.setText("{}".format(round(data[3],3)))
+        self.TCont.real_data_request()
+        if self.TCont.temp != -1:
+            self.tempStatus.setText("{} K".format(self.TCont.temp))
+        else:
+            self.tempStatus.setText("NA")
     
     def startProgram(self):
         #print(self.temptable.model._data)
@@ -333,7 +391,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked():
                 # TODO: add option for both heating and cooling option
                 self.filenameText.setEnabled(False)
-                #self.saveDir.setEnabled(False)
+                self.saveDir.setEnabled(False)
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
     
@@ -374,6 +432,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         freqAxis.autoSIPrefix = False
         self.ImpdPlot.addLegend()
+        #self.ImpdPlot.getPlotItem().enableAutoRange('left',True)
+        #self.ImpdPlot.getPlotItem().enableAutoRange('bottom',True)
+        self.ImpdPlot.getPlotItem().enableAutoScale()
         
     def plotFsweepData(self,data):
         pen1 = mkPen('b', width=2)
@@ -427,9 +488,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
         
     def finishAction(self):
-        
-        # Save the data
         if self.FsweepRun:
+            # Save the data
             with open(self.sampleID_fSweep, 'w') as f:
                 try:
                     temperature = self.TCont.temp
@@ -444,13 +504,16 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                     for word in line:
                         f.write(word + '\t')
                     f.write('\n')
+            self.FsweepRun = False
         elif self.TFsweepRun:
             self.filenameText.setEnabled(True)
-            #self.saveDir.setEnabled(True)
+            self.saveDir.setEnabled(True)
+            self.TFsweepRun = False
         self.finished = True
-        self.FsweepRun = False
-        self.TFsweepRun = False
-        self.stopProgram()
+        self.statusBox.setEnabled(True)
+        self.startButton.setEnabled(True)
+        self.stopButton.setEnabled(False)
+        self.continuousDisplay()
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
@@ -487,7 +550,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.addLegend()
         mintemp = min(self.startTemp.value(),self.stopTemp.value())
         maxtemp = max(self.startTemp.value(),self.stopTemp.value())
-        self.ImpdPlot.setRange(xRange=(mintemp-20, maxtemp+20), padding=0)
+        self.ImpdPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
         self.TFPlots = []
         self.tempData = [fdata[-1]]
         self.freqData = fdata[0]
@@ -495,7 +558,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         l = len(self.freqData)
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
         for i,Fdata in enumerate(self.freqData):
-            pen1 = mkPen(intColor(3*(i+1), values=3), width=2)
+            pen1 = mkPen(intColor((i+1), values=3), width=2)
             if Fdata < 1e3:
                 freqlabel = "{} Hz".format(round(Fdata,2))
             elif 1e6 > Fdata >= 1e3:
@@ -536,17 +599,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             f.write('\n')
         
     def stopProgram(self):
-        if not self.finished:
-            if self.TFsweepRun:
-                self.tSweepWorker.stopcall.emit()
-                self.TFsweepRun = False
-            if self.FsweepRun:
-                self.fSweepWorker.stopcall.emit()
-                self.FsweepRun = False
-        if not self.idleRun:
-            self.startIdleThread()
-            self.idleRun = True
-            self.showControllerStatus()
+        if self.FsweepRun:
+            self.fSweepWorker.stopcall.emit()
+        elif self.TFsweepRun:
+            self.tSweepWorker.stopcall.emit()
+        self.continuousDisplay()
         self.statusBox.setEnabled(True)
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
