@@ -50,6 +50,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startTemp.valueChanged.connect(self.updateStartTemp)
         self.stopTemp.valueChanged.connect(self.updateStopTemp)
         self.heatRate.valueChanged.connect(self.updateRateTemp)
+        self.stablizationTime.valueChanged.connect(self.updateStabilizationTime)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.setFixedTemperature.clicked.connect(self.setTemperature)
@@ -66,10 +67,12 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.idleRun = False
         self.TFsweepRun = False
         self.FsweepRun = False
+        self.finished = True
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
+        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.continuousDisplay()
@@ -232,6 +235,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #TODO maybe show the frequency returned by the instrument?
         self.freqStatus.setText("{0} {1}".format(self.impd.freq, self.impd.freqUnit))
     
+    def updateStabilizationTime(self):
+        self.TCont.stabilizationTime = self.stabilizationTime.value()
+        
     def updateTempTraceback(self):
         if self.tempTraceback.isChecked():
             self.TCont.traceback = True
@@ -397,14 +403,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.Vncycles.setEnabled(False)
     
     def continuousDisplay(self):
-        if not self.idleRun:
+        if not self.idleRun and self.finished:
             self.idleRun = True
             self.startIdleThread()
             self.showControllerStatus()
         
     def startIdleThread(self):
         self.idlethread = QThread()
-        self.idleWorker = IdleWorker(self.impd)
+        self.idleWorker = IdleWorker(self.impd,self.TCont)
         self.idleWorker.moveToThread(self.idlethread)
         self.idlethread.started.connect(self.idleWorker.start)
         self.idleWorker.finished.connect(self.idlethread.quit)
@@ -444,9 +450,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             capacitance*=1e12
         self.capStatus.setText("{0} {1}".format(round(capacitance,3), capUnit))
         self.tandStatus.setText("{}".format(round(data[3],3)))
-        self.TCont.real_data_request()
-        if self.TCont.temp != -1:
-            self.tempStatus.setText("{} K".format(self.TCont.temp))
+        temperature = data[-1]
+        if temperature != -1:
+            self.tempStatus.setText("{} K".format(temperature))
         else:
             self.tempStatus.setText("NA")
     
@@ -471,6 +477,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked():
                 # TODO: add option for both heating and cooling option
                 self.filenameText.setEnabled(False)
+                self.statusBar().showMessage("Waiting to reach start temperature..")
                 self.saveDir.setEnabled(False)
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
@@ -606,6 +613,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tSweepWorker.finished.connect(self.tSweepWorker.deleteLater)
         self.tempthreadf.finished.connect(self.tempthreadf.deleteLater)
         self.tSweepWorker.data.connect(self.plotTsweepData)
+        self.tSweepWorker.showStatus.connect(self.statusBar().showMessage)
         self.tSweepWorker.freqSig.connect(self.initialize_temperatureFSweep_plot)
         #self.thread.finished.connect(self.finishAction)
         self.tempthreadf.start()

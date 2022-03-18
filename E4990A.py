@@ -112,6 +112,7 @@ class KeysightE44990A(Instrument):
         self.write(":SOUR1:MODE VOLT")
         # set DC Bias mode as voltage
         self.write(":SOUR1:BIAS:MODE VOLT")
+        self.set_measurement_parameter()
 
     def enable_DC_Bias(self,ans=True):
         if ans == True:
@@ -456,7 +457,7 @@ class KeysightE44990A(Instrument):
         self.write(":CALC1:PAR1:DEF Z")
         
         # set trace 2 to measure impedance phase
-        self.write(":CALC1:PAR2:DEF TZ")
+        #self.write(":CALC1:PAR2:DEF TZ")
     
     def set_yAxis_log(self):
         """
@@ -745,7 +746,7 @@ class KeysightE44990A(Instrument):
         p = randint(1, 100)
         c = uniform(1e-7, 1e-12)
         d = uniform(0, 1)
-        sleep(0.2)
+        sleep(2)
         return z, p, c, d
     
     def get_absolute_frequency(self, freq, units):

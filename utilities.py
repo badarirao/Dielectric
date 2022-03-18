@@ -88,6 +88,7 @@ class FakeTempController(FakeAdapter):
         self.tCount = 0
         self.traceback = False
         self.interval = 1
+        self.stabilizationTime = 10 # 10 minutes
     
     @property
     def temp(self):
@@ -359,9 +360,10 @@ class IdleWorker(QObject):
     data = pyqtSignal(list)
     stopcall = pyqtSignal()
 
-    def __init__(self, impd=None):
+    def __init__(self, impd=None, TCont=None):
         super().__init__()
         self.impd = impd
+        self.TCont = TCont
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
 
@@ -370,14 +372,16 @@ class IdleWorker(QObject):
 
     def get_status(self):
         z, p, c, d = self.impd.get_current_values()
-        self.data.emit([z, p, c, d])
+        self.TCont.real_data_request()
+        t = self.TCont.temp
+        self.data.emit([z, p, c, d, t])
 
     def start(self):
         self.stopCall = False
         while True:
-            self.get_status()
             if self.stopCall == True:
                 break
+            self.get_status()
         self.finished.emit()
 
 class FrequencySweepWorker(QObject):
@@ -402,7 +406,7 @@ class FrequencySweepWorker(QObject):
 
     def start_frequency_sweep(self):
         # TODO add option to set DC bias also
-        
+        self.impd.trig_from_PC()
         self.impd.write(":INIT1:CONT ON")
         if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
@@ -454,6 +458,7 @@ class TemperatureSweepWorkerF(QObject):
     data = pyqtSignal(list)
     freqSig = pyqtSignal(list)
     stopcall = pyqtSignal()
+    showStatus = pyqtSignal(str)
 
     def __init__(self, impd=None, TCont = None):
         super().__init__()
@@ -477,7 +482,30 @@ class TemperatureSweepWorkerF(QObject):
     def start_temperature_sweep(self):
         # TODO add option to set DC bias also
         # TODO: the last temperature point is not being saved.
+        self.TCont.temp = self.TCont.startT
+        # wait till present temperature reaches start temperature
+        self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
+        while abs(self.TCont.temp-self.TCont.startT) < 2:
+            if self.stopCall == True:
+                self.TCont.reset()
+                self.showStatus.emit("Aborted")
+                break
+            sleep(2)
+        self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
+        count = 0
+        # wait to stabilize at the start temperature
+        #TODO: make wait time a user defined parameter
+        waitCount = self.TCont.stabilizationTime*60/2
+        while count < waitCount: # write 300 to make wait time as 10 minutes
+            if self.stopCall == True:
+                self.TCont.reset()
+                self.showStatus.emit("Aborted")
+                break
+            count += 1
+            sleep(2)
+        self.showStatus.emit("Measuring..")
         self.impd.write(":INIT1:CONT ON")
+        self.impd.trig_from_PC()
         if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
         elif self.spacing == 1:
@@ -523,6 +551,7 @@ class TemperatureSweepWorkerF(QObject):
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
         if self.TCont.mode in (0,1):
+            print(self.TCont.startT,self.TCont.stopT,self.TCont.rate)
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
             while self.TCont.isRunning():
@@ -544,8 +573,9 @@ class TemperatureSweepWorkerF(QObject):
                         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                         tcount += 1
                         if tcount+1 >= len(TempList):
-                            self.TCont.abort()
+                            self.TCont.reset()
                             self.data.emit([measuredData,averageTemperature])
+                            self.showStatus.emit("Finshed")
                             break
                     else:
                         continue
@@ -556,8 +586,11 @@ class TemperatureSweepWorkerF(QObject):
                 else:
                     self.data.emit([measuredData,averageTemperature])
                 if self.stopCall == True:
-                    self.TCont.abort()
+                    self.TCont.reset()
+                    self.showStatus.emit("Aborted")
                     break
+            if self.stopCall == False:
+                self.showStatus.emit("Finshed")
             self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):

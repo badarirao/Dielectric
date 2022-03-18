@@ -46,12 +46,14 @@ class ChinoKP1000C(object):
         self._temp = temp
         self.startT = 300
         self.stopT = 10
-        self.rate = -1 # degreee per minute
+        self.rate = 1 # degreee per minute
         self.mode = 0
         self.tCount = 0
         self.traceback = False
         self.interval = 1
+        self.all_modes_lock()
         self.real_data_request()
+        self.stabilizationTime = 10 # 10 minutes
 
     def read_param(self, param):
         self.write_param(param)
@@ -97,6 +99,7 @@ class ChinoKP1000C(object):
     def real_data_request(self):
         # get current status from the controller
         self.data = self.read_param(' 1, 1,')
+        # example response: ' 1, 1, 0,0,  276.42,       0,1,2,  0.00,6,       0,0,       0,'
         temp = self.data.split(',')
         self.pattern_no = int(temp[1].replace(" ", ""))
         self.step_no = int(temp[2].replace(" ", ""))
@@ -104,7 +107,7 @@ class ChinoKP1000C(object):
         self.PV = float(temp[4].replace(" ", ""))
         self.SV = float(temp[5].replace(" ", ""))
         self.time_display_system = int(temp[6].replace(" ", ""))
-        self.time_unit = int(temp[7].replace(" ", ""))
+        self.time_unit = int(temp[7].replace(" ", "")) # 1 = minute, 2 = Hours, 3 = days
         self.time = temp[8].replace(" ", "")  # hours/minutes
         self.status = int(temp[9].replace(" ", ""))
         self.MV1 = float(temp[10].replace(" ", ""))
@@ -158,19 +161,24 @@ class ChinoKP1000C(object):
         self.write_param('48,{0},'.format(dirn))
 
     def rampT(self):
-        rampTime = round(abs((self.startT-self.stopT)/self.rate)/60,4)
-        self.write_param(' 3, 1, 01,00,{},0,'.format(self.startT))   # step 0, start at Start Temp
-        self.write_param(' 3, 2, 01,01,{0},{1},'.format(self.stopT,rampTime)) # go to stop temperature K at rate k/min rate
+        # maybe go to start temperature first?
+        self.write_param(' 2, 4,0, ,') # set to program mode
+        rampTime = round(abs((self.startT-self.stopT)/self.rate)/60,2)
+        self.write_param(' 3, 1,1,00, ,1,')   # step 0, start from present value
+        self.write_param(' 3, 2,1,01,{0},{1},'.format(self.stopT,rampTime)) # go to stop temperature K at rate k/min rate
         if self.traceback:
-            self.write_param(' 3, 2, 01,02,{0},{1},'.format(self.startT,rampTime))  # go to 20K at 5k/min
-            self.write_param(' 3, 3, 01,03,00,0,') # end program, and set output to zero
+            self.write_param(' 3, 2,1,02,{0},{1},'.format(self.startT,rampTime))  # go to 20K at 5k/min
+            self.write_param(' 3, 3,1,03,00,0,') # end program, and set output to zero
         else:
-            self.write_param(' 3, 3, 01,02,00,0,') # end program, and set output to zero
+            self.write_param(' 3, 3,1,02,00,0,') # end program, and set output to zero
         
-        self.write_param(' 2, 1, 1, 01,') # run pattern 1
+        self.write_param(' 2, 1,1,01,') # run pattern 1
     
+    def clearPattern(self,pattern_no=1):
+        self.write_param(' 3, 8,1,')
+        
     def abort(self):
-        # abort pattern 1
+        # abort pattern 1, programs maintains the current temperature
         self.write_param(' 2, 1, 2, 01,')
         
     def reset(self):
@@ -178,11 +186,14 @@ class ChinoKP1000C(object):
     
     def isRunning(self):
         #TODO: verify the value stored in self.status
-        self.read_data_request()
-        if self.status:
+        self.real_data_request()
+        if self.status == 0:
             return True
         else:
             return False
+    
+    def close(self):
+        self.s.close()
 
     # def continue_program(self):
 
