@@ -26,6 +26,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def __init__(self, *args, obj=None, **kwargs):
         super(mainControl, self).__init__(*args, **kwargs)
         self.setupUi(self)
+        self.checkPaths()
         self.fixFreq.clicked.connect(self.freqOption)
         self.fixTemp.clicked.connect(self.tempOption)
         self.fixDCvolts.clicked.connect(self.DCvoltOption)
@@ -79,6 +80,85 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.loadTempButton.clicked.connect(self.showTempTable)
         # TODO: Make a default temperature table, and load it in the beginning.
         """
+    
+    def checkPaths(self):
+        """
+        Check for paths to store data and setting files.
+        
+        address.txt stores path where SettingFile.dnd is stored.
+        If address.txt not found, or path in it is invalid, 
+        put SettingFile.dnd in current working directory.
+        
+        SettingFile.dnd stores path where last measurement data is stored,
+        and also the last used filename. 
+        If SettingFile.dnd does not exist or if path given in SettingFile.dnd 
+        does not exist, set desktop as the default path to store the 
+        measurement data. 
+        If desktop is not found in C: drive, then make current working 
+        directory as default path to store measurement data. 
+        Use default sample name as "Sample".
+
+        Returns
+        -------
+        None.
+
+        """
+        self.settingPath = ""
+        self.sampleID = ''
+        self.initialPath = os.getcwd()
+        try:
+            with open('address.txt') as f:
+                self.settingPath = f.readline().strip()# get path of SettingFile.dnd
+                self.E49990Addr = f.readline().strip().split() # get address of K2450 if present
+                if self.E49990Addr:
+                    self.E49990Addr = self.E49990Addr[0]
+                else:
+                    self.E49990Addr = ''
+                self.k2700Addr = f.readline().strip().split() # get address of K700 if present
+                if self.k2700Addr:
+                    self.k2700Addr = self.k2700Addr[0]
+                else:
+                    self.k2700Addr = ''
+                self.TControlAddr = f.readline().strip().split() # get address of AFG1022 if present
+                if self.TControlAddr:
+                    self.TControlAddr = self.TControlAddr[0]
+                else:
+                    self.TControlAddr = ''
+                self.TSensorAddr = f.readline().strip().split() # get address of AFG1022 if present
+                if self.TSensorAddr:
+                    self.TSensorAddr = self.TSensorAddr[0]
+                else:
+                    self.TSensorAddr = ''
+                os.chdir(self.settingPath)
+        except FileNotFoundError:
+            with open('address.txt','w') as f:
+                f.write(self.initialPath)
+            self.settingPath = self.initialPath
+            self.E49990Addr = ''
+            self.k2700Addr = ''
+            self.TControlAddr = ''
+            self.TSensorAddr = ''
+            
+        # set default path to store measured data as desktop
+        self.defaultPath = os.path.join(
+            os.path.expandvars("%userprofile%"), "Desktop")
+        # set default path as current directory if desktop is not found in C drive
+        if not os.path.exists(self.defaultPath):
+            self.defaultPath = self.initialPath 
+
+        # SettingFile contains last used filename & its location, which is loaded initially
+        try:
+            with open('SettingFile.dnd', 'r') as f:
+                self.currPath = f.readline().strip('\n\r')
+                self.sampleID = get_valid_filename(f.readline().strip())
+                if self.sampleID == '' or self.sampleID.isspace():
+                    self.sampleID = "Sample"
+                os.chdir(self.currPath)
+                self.filenameText.setText(self.sampleID)
+        except FileNotFoundError: # if SettingFile does not exist, set default name
+            self.currPath = self.defaultPath
+            os.chdir(self.defaultPath)
+            self.sampleID = "Sample"
     
     def initializeParameters(self):
         self.updateFixedDCVoltage()
@@ -484,6 +564,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         dirName = options.getExistingDirectory()
         if dirName:
             os.chdir(dirName)
+            self.currPath = dirName
             self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='txt')
             self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
         
@@ -623,6 +704,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.tSweepWorker.stopcall.emit()
             if self.FsweepRun:
                 self.fSweepWorker.stopcall.emit()
+            os.chdir(self.settingPath)
+            with open('SettingFile.dnd', 'w') as f:
+                f.write(self.currPath+'\n')
+                f.write(self.sampleID)
+            os.chdir(self.initialPath)
             event.accept()
         else:
             event.ignore()

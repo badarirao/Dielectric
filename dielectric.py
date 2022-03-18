@@ -838,7 +838,7 @@ class Ui_ImpedanceApp(object):
         self.saveParamButton.setText(_translate("ImpedanceApp", "Save Parameters"))
         self.loadParamButton.setText(_translate("ImpedanceApp", "Load Parameters"))
         self.saveFilenameLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Save Filename</span></p></body></html>"))
-        self.filenameText.setText(_translate("ImpedanceApp", "sample1"))
+        self.filenameText.setText(_translate("ImpedanceApp", "Sample"))
         self.saveDir.setToolTip(_translate("ImpedanceApp", "<html><head/><body><p>Choose directory to save the measurement data.</p></body></html>"))
         self.saveDir.setText(_translate("ImpedanceApp", "Directory"))
         self.plotBox.setTitle(_translate("ImpedanceApp", "Plot"))

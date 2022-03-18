@@ -116,8 +116,11 @@ dmypy.json
 # design file
 *.ui
 
-# measurement data
+# measurement data and address file
 *.txt
 
 # pdf files
 *.pdf
+
+# setting file
+*.dnd
