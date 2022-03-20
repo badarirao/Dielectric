@@ -114,6 +114,15 @@ class KeysightE44990A(Instrument):
         self.write(":SOUR1:BIAS:MODE VOLT")
         self.set_measurement_parameter()
 
+    def initialize(self):
+        # initialize the instrument to obtain absolute Z, phase Z, Capacitance, and loss in respective four channels
+        
+        pass
+
+    def initializeDisplay(self):
+        # initialize the display to view four channels in split view mode
+        pass
+    
     def enable_DC_Bias(self,ans=True):
         if ans == True:
             self.write(":SOUR:BIAS:STAT ON")
@@ -281,9 +290,27 @@ class KeysightE44990A(Instrument):
             DESCRIPTION.
 
         """
-        data = self.ask(":CALC1:DATA:FDAT?")
-        data = data.split(',')
-        return [float(x) for i,x in enumerate(data) if i%2==0]
+        self.write(":Calculate1:Parameter1:Sel")
+        z = self.ask(":Calculate1:Data:Fdat")
+        z = z.split(',')
+        z = [float(x) for i,x in enumerate(z) if i%2==0]
+        self.write(":Calculate1:Parameter2:Sel")
+        p = self.ask(":Calculate1:Data:Fdat")
+        p = p.split(',')
+        p = [float(x) for i,x in enumerate(p) if i%2==0]
+        sleep(0.1)
+        self.write(":Calculate1:Parameter3:Sel")
+        c = self.ask(":Calculate1:Data:Fdat")
+        c = c.split(',')
+        c = [float(x) for i,x in enumerate(c) if i%2==0]
+        sleep(0.1)
+        self.write(":Calculate1:Parameter4:Sel")
+        d = self.ask(":Calculate1:Data:Fdat")
+        d = d.split(',')
+        d = [float(x) for i,x in enumerate(d) if i%2==0]
+        sleep(0.1)
+        data = [z,p,c,d]
+        return data
     
     def get_frequencies(self):
         """
@@ -385,6 +412,9 @@ class KeysightE44990A(Instrument):
 
         """
         self.write(":TRIG:SOUR BUS")
+    
+    def trig_from_internal(self):
+        self.write(":TRIG:SOUR INT")
     
     def set_measurement_parameter(self):
         """
@@ -729,18 +759,23 @@ class KeysightE44990A(Instrument):
         self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
     
     def get_current_values(self):
-        """
         self.write(":Calculate1:Parameter1:Sel")
         z = self.ask(":Calculate1:Data:Fdat")
         z = z.split(',')
-        z = [float(x) for x in z]
-        sleep(0.1)
+        z = float(z[0])
         self.write(":Calculate1:Parameter2:Sel")
         p = self.ask(":Calculate1:Data:Fdat")
-        p = z.split(',')
-        p = [float(x) for x in p]
-        sleep(0.1)
-        return z,p
+        p = p.split(',')
+        p = float(p[0])
+        self.write(":Calculate1:Parameter3:Sel")
+        c = self.ask(":Calculate1:Data:Fdat")
+        c = c.split(',')
+        c = float(c[0])
+        self.write(":Calculate1:Parameter4:Sel")
+        d = self.ask(":Calculate1:Data:Fdat")
+        d = d.split(',')
+        d = float(d[0])
+        return z,p,c,d
         """
         z = randint(1000, 10000)
         p = randint(1, 100)
@@ -748,6 +783,7 @@ class KeysightE44990A(Instrument):
         d = uniform(0, 1)
         sleep(2)
         return z, p, c, d
+        """
     
     def get_absolute_frequency(self, freq, units):
         if units == 0: # Hz
@@ -810,7 +846,12 @@ class KeysightE44990A(Instrument):
             self.write(":SENS1:AVER ON") # enable point average
         self.write(":SENS1:AVER:COUN {}".format(value))
     
-    def 
-        
+    def disable_display_update(self):
+        # disable display update
+        self.write(":DISP:ENAB OFF")
+
+    def enable_display_update(self):
+        # enable display update        
+        self.write(":DISP:ENAB ON")
     
     

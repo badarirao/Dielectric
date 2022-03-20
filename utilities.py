@@ -22,6 +22,9 @@ from chino import ChinoKP1000C
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
+# TODO: FakeImpd should return all four parameters during freq sweep
+# TODO: FakeTempController should return all four parameters during temperature sweep
+
 class FakeAdapter():
     """Provides a fake adapter for debugging purposes.
 
@@ -200,7 +203,7 @@ class FakeImpd(FakeAdapter):
             self.dArray.append(d)
     
     def read_measurement_data(self):
-        return self.zArray
+        return [self.zArray,self.pArray,self.cArray,self.dArray]
     
     def get_frequencies(self):
         return self.scannedFrequencies
@@ -372,12 +375,31 @@ class IdleWorker(QObject):
         t = self.TCont.temp
         self.data.emit([z, p, c, d, t])
 
+    
+    def initialize(self): # initialize frequency, AC voltage, DC voltage
+        self.impd.write(":INIT1:CONT ON")
+        self.impd.write(":SENS1:SWE:TYPE LIN")
+        self.impd.write(":SENS1:SWE:POIN 2") # set number of points
+        self.impd.write(":SENS1:FREQ:STAR {}".format(self.impd._freq)) # set start frequency
+        self.impd.write(":SENS1:FREQ:STOP 1e7") # set stop frequency as 10 MHz
+        self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
+        self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+        if self.impd.Vdc:
+            if not self.impd.is_BIAS_ON():
+                self.impd.enable_DC_Bias(True)
+            self.impd.setVdc()
+        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        self.impd.trig_from_internal()
+    
     def start(self):
+        self.impd.disable_display_update() # disable display update
+        self.initialize()
         self.stopCall = False
         while True:
             if self.stopCall == True:
                 break
             self.get_status()
+        self.impd.enable_display_update()
         self.finished.emit()
 
 class FrequencySweepWorker(QObject):
@@ -386,9 +408,10 @@ class FrequencySweepWorker(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None):
+    def __init__(self, impd=None, TCont=None):
         super().__init__()
         self.impd = impd
+        self.TCont = TCont
         self.start = self.impd.startf
         self.end = self.impd.endf
         self.npoints = self.impd.npointsf
@@ -441,12 +464,16 @@ class FrequencySweepWorker(QObject):
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
         self.showStatus.emit("Started frequency sweep, please wait..")
+        sweepInitialTemperature = self.TCont.temp
         self.impd.start_fSweep()
         # TODO: Set the display on the instrument as desired
         self.impd.wait_to_complete()
+        sweepFinalTemperature = self.TCont.temp
+        averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+        deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
         measuredData = self.impd.read_measurement_data()
-        frequencyData = self.impd.get_frequencies()
-        wholedata = [frequencyData,measuredData]
+        frequencyData = [self.impd.get_frequencies()]
+        wholedata = frequencyData + measuredData + [averageTemperature] + [deltaT]
         self.showStatus.emit("Frequency sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()
@@ -557,9 +584,6 @@ class TemperatureSweepWorkerF(QObject):
                     self.impd.start_fSweep()
                     self.impd.wait_to_complete()
                     measuredData = self.impd.read_measurement_data()
-                    sweepFinalTemperature = self.TCont.temp
-                    averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
-                    deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
                 else:
                     smallTemp = min(TempList[tcount],TempList[tcount+1])
                     largeTemp = max(TempList[tcount],TempList[tcount+1])
@@ -567,22 +591,27 @@ class TemperatureSweepWorkerF(QObject):
                         self.impd.start_fSweep()
                         self.impd.wait_to_complete()
                         measuredData = self.impd.read_measurement_data()
-                        sweepFinalTemperature = self.TCont.temp
-                        averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
-                        deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
                         tcount += 1
                         if tcount+1 >= len(TempList):
                             self.TCont.reset()
-                            self.data.emit([measuredData,averageTemperature,deltaT])
+                            sweepFinalTemperature = self.TCont.temp
+                            averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                            deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                            wholeData = measuredData + [averageTemperature, deltaT]
+                            self.data.emit(wholeData)
                             break
                     else:
                         continue
+                sweepFinalTemperature = self.TCont.temp
+                averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                wholeData = measuredData + [averageTemperature, deltaT]
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
-                    self.freqSig.emit([frequencyData,measuredData,averageTemperature,deltaT])
+                    self.freqSig.emit([frequencyData] + wholeData)
                     self.TCont.tCount += 1
                 else:
-                    self.data.emit([measuredData,averageTemperature,deltaT])
+                    self.data.emit(wholeData)
                 if self.stopCall == True:
                     self.TCont.reset()
                     self.showStatus.emit("Temperature sweep aborted. Partial data saved.")

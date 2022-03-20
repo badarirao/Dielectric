@@ -18,6 +18,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: If MUX is connected, option to switch sample and do parallel measurements
     # If in cryochamber, switch between sample cr1 and cr2
     # If using probe and linkam heater, switch between sample1, 2 and 3
+# TODO: see if you can plot directly from the pandas dataframe
+# TODO: can you update an existng dataframe into the CSV file?
  
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -25,6 +27,7 @@ from dielectric import Ui_ImpedanceApp
 from pyqtgraph import mkPen, intColor
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
+from pandas import DataFrame, Series, concat
 from PyQt5.QtCore import QThread
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
@@ -72,6 +75,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tempOption()
         self.show()
         self.temperatures = []
+        self.plotIndex = 2
         self.freqsweep = True
         self.idleRun = False
         self.TFsweepRun = False
@@ -492,7 +496,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def startFreqSweepThread(self):
         self.freqthread = QThread()
-        self.fSweepWorker = FrequencySweepWorker(self.impd)
+        self.fSweepWorker = FrequencySweepWorker(self.impd,self.TCont)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
         self.fSweepWorker.finished.connect(self.finishAction)
@@ -532,8 +536,19 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def plotFsweepData(self,data):
         pen1 = mkPen('b', width=2)
-        self.frequency_sweep_data = data
-        self.ImpdPlot.plot(data[0], data[1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
+        fdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
+        self.frequency_sweep_data = DataFrame(fdata,columns=['Frequency(Hz)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
+        self.ImpdPlot.plot(data[0], data[self.plotIndex+1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
+        try:
+            temperature = data[-2]
+            deltaT = data[-1]
+        except:
+            temperature = 'NA'
+            deltaT = 0
+        # Save the data to file
+        with open(self.sampleID_fSweep, 'w') as f:
+            f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}\n\n".format(self.impd.Vac, self.impd.Vdc, temperature, deltaT))
+            self.frequency_sweep_data.to_csv(f,index=False)
         
     def setFileName(self, initial = 0):
         """
@@ -584,21 +599,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def finishAction(self):
         if self.FsweepRun:
-            # Save the data
-            with open(self.sampleID_fSweep, 'w') as f:
-                try:
-                    temperature = self.TCont.temp
-                except:
-                    temperature = 'NA'
-                f.write("AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K\n\n".format(self.impd.Vac, self.impd.Vdc, temperature))
-                f.write("Frequency (Hz)\n")
-                for row in range(len(self.frequency_sweep_data[0])):
-                    line = []
-                    for column in range(len(self.frequency_sweep_data)):
-                        line.append(str(self.frequency_sweep_data[column][row]))
-                    for word in line:
-                        f.write(word + '\t')
-                    f.write('\n')
             self.FsweepRun = False
         elif self.TFsweepRun:
             self.filenameText.setEnabled(True)
@@ -650,48 +650,73 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tempData = [fdata[-2]]
         self.freqData = fdata[0]
         self.zData = vstack(fdata[1])
+        self.pData = vstack(fdata[2])
+        self.cData = vstack(fdata[3])
+        self.dData = vstack(fdata[4])
+        self.Data = [self.zData,self.pData,self.cData,self.dData]
         l = len(self.freqData)
+        header = ['Temperature(K)', 'ΔT(K)']
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
         for i,Fdata in enumerate(self.freqData):
             pen1 = mkPen(intColor((i+1), values=3), width=2)
             if Fdata < 1e3:
                 freqlabel = "{} Hz".format(round(Fdata,2))
+                header.append('Z{}Hz'.format(round(Fdata,2)))
+                header.append('p{}Hz'.format(round(Fdata,2)))
+                header.append('C{}Hz'.format(round(Fdata,2)))
+                header.append('d{}Hz'.format(round(Fdata,2)))
             elif 1e6 > Fdata >= 1e3:
                 freqlabel = "{} kHz".format(round(Fdata/1e3,2))
+                header.append('Z{}kHz'.format(round(Fdata/1e3,2)))
+                header.append('p{}kHz'.format(round(Fdata/1e3,2)))
+                header.append('C{}kHz'.format(round(Fdata/1e3,2)))
+                header.append('d{}kHz'.format(round(Fdata/1e3,2)))
             elif Fdata >= 1e6:
                 freqlabel = "{} MHz".format(round(Fdata/1e6,2))
-            self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.zData[i], pen = pen1))
+                header.append('Z{}MHz'.format(round(Fdata/1e6,2)))
+                header.append('p{}MHz'.format(round(Fdata/1e6,2)))
+                header.append('C{}MHz'.format(round(Fdata/1e6,2)))
+                header.append('d{}MHz'.format(round(Fdata/1e6,2)))
+            self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.Data[self.plotIndex][i], pen = pen1))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
             else:
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
+        pData = [fdata[-2],fdata[-1]]
+        for i in range(len(fdata[0])):
+            pData.append(fdata[1][i])
+            pData.append(fdata[2][i])
+            pData.append(fdata[3][i])
+            pData.append(fdata[4][i])
+        self.dfData = DataFrame(data = [pData],columns=header)
         with open(self.sampleID_tSweepF, 'w') as f:
-            f.write("AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
-            f.write("Temperature(K)\tΔT(K)")
-            for freq in self.freqData:
-                if freq<1e3:
-                    text = '\t{:.2f}Hz'.format(freq)
-                elif 1e3 <= freq < 1e6:
-                    text = '\t{:.2f}kHz'.format(freq/1e3)
-                elif freq >= 1e6:
-                    text = '\t{:.2f}MHz'.format(freq/1e6)
-                f.write(text)
-            f.write('\n')
-            line = array((fdata[1]))
-            line = concatenate(([fdata[-2]],[fdata[-1]],line))
-            savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
-            f.write('\n')
+            f.write("#AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
+            self.dfData.to_csv(f,index=False)
         
     def plotTsweepData(self, data):
         self.tempData.append(data[-2])
         self.zData = hstack((self.zData,vstack(data[0])))
+        self.pData = hstack((self.pData,vstack(data[1])))
+        self.cData = hstack((self.cData,vstack(data[2])))
+        self.dData = hstack((self.dData,vstack(data[3])))
+        self.Data = [self.zData,self.pData,self.cData,self.dData]
+        pData = [data[-2],data[-1]]
+        for i in range(len(data[0])):
+            pData.append(data[0][i])
+            pData.append(data[1][i])
+            pData.append(data[2][i])
+            pData.append(data[3][i])
+        self.dfRow = Series(pData,self.dfData.columns)
+        self.dfData = self.dfData.append(self.dfRow,ignore_index=True)
+        rData = DataFrame(data = [pData],columns=self.dfData.columns)
         for i in self.plotPoints:
-            self.TFPlots[i].setData(self.tempData,self.zData[i])
+            self.TFPlots[i].setData(self.tempData,self.Data[self.plotIndex][i])
         line = array((data[0]))
         line = concatenate(([data[-2]],[data[-1]],line))
-        with open(self.sampleID_tSweepF, 'a') as f:
-            savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
-            f.write('\n')
+        rData.to_csv(self.sampleID_tSweepF,index=False,mode='a',header=False)
+        #with open(self.sampleID_tSweepF, 'a') as f:
+        #    savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
+        #    f.write('\n')
         
     def stopProgram(self):
         if self.FsweepRun:
@@ -713,7 +738,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         reply = QtGui.QMessageBox.question(self, 'Confirm Exit',
                                            quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         if reply == QtGui.QMessageBox.Yes:
-            self.Impd.close()
+            self.impd.close()
             self.TCont.close()
             # TODO: Close all connected instruments (Other multimeters? multiplexer)
             if self.TFsweepRun:
