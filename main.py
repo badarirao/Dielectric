@@ -9,16 +9,25 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen
 self.ImpdPlot = PlotWidget(self.centralwidget,viewBox=ViewBox(border = mkPen(color='k',width = 2)))
 self.ImpdPlot.setBackground((255,182,193,25))
 """
+# TODO: Set all tooltips appropriately
+# TODO: set TabOrder correctly
+# TODO: Option to just continuously do freqsweep and monitor the temperature (no temperature control)
+# TODO: Option to monitor temperature from other sensors
+# TODO: Check how to efficiently implement idle display. Currently looks like only freq-sweep is possible
+    # in that case, do fsweep of 2 points, and display data of desired freq. Also disable instrument window display
+# TODO: If MUX is connected, option to switch sample and do parallel measurements
+    # If in cryochamber, switch between sample cr1 and cr2
+    # If using probe and linkam heater, switch between sample1, 2 and 3
+ 
 import sys, os
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtGui
 from dielectric import Ui_ImpedanceApp
-from pyqtgraph import PlotWidget, ViewBox, mkPen, intColor
+from pyqtgraph import mkPen, intColor
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
-from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
+from PyQt5.QtCore import QThread
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
-from time import sleep
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -50,7 +59,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startTemp.valueChanged.connect(self.updateStartTemp)
         self.stopTemp.valueChanged.connect(self.updateStopTemp)
         self.heatRate.valueChanged.connect(self.updateRateTemp)
-        self.stablizationTime.valueChanged.connect(self.updateStabilizationTime)
+        self.stabilizationTime.valueChanged.connect(self.updateStabilizationTime)
         self.actionExit.triggered.connect(self.close)
         self.measureMode.currentIndexChanged.connect(self.measureModeSet)
         self.setFixedTemperature.clicked.connect(self.setTemperature)
@@ -70,9 +79,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.finished = True
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
-        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
+        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.continuousDisplay()
@@ -475,7 +484,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.startFreqSweepThread()
                 self.FsweepRun = True
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked():
-                # TODO: add option for both heating and cooling option
                 self.filenameText.setEnabled(False)
                 self.statusBar().showMessage("Waiting to reach start temperature..")
                 self.saveDir.setEnabled(False)
@@ -492,6 +500,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fSweepWorker.finished.connect(self.fSweepWorker.deleteLater)
         self.freqthread.finished.connect(self.freqthread.deleteLater)
         self.fSweepWorker.data.connect(self.plotFsweepData)
+        self.fSweepWorker.showStatus.connect(self.statusBar().showMessage)
         #self.thread.finished.connect(self.finishAction)
         self.freqthread.start()
         self.initialize_frequencySweep_plot()
@@ -513,15 +522,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
         self.ImpdPlot.setLabel('bottom', 'Frequency', units = 'Hz', **styles)
         if self.spacingType.currentIndex() == 0:
-            self.ImpdPlot.getPlotItem().setLogMode(None, None)
+            self.ImpdPlot.setLogMode(None, None)
         else:
-            self.ImpdPlot.getPlotItem().setLogMode(True, None)
+            self.ImpdPlot.setLogMode(True, None)
         freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         freqAxis.autoSIPrefix = False
         self.ImpdPlot.addLegend()
-        #self.ImpdPlot.getPlotItem().enableAutoRange('left',True)
-        #self.ImpdPlot.getPlotItem().enableAutoRange('bottom',True)
-        self.ImpdPlot.getPlotItem().enableAutoScale()
+        self.ImpdPlot.enableAutoRange()
         
     def plotFsweepData(self,data):
         pen1 = mkPen('b', width=2)
@@ -628,20 +635,19 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
 
         """
         self.ImpdPlot.clear()
+        self.ImpdPlot.setLogMode(None, None)
         styles = {'color': 'r', 'font-size': '20px'}
         if self.yaxis == 'z':
             self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
         elif self.yaxis == 'c':
             self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
         self.ImpdPlot.setLabel('bottom', 'Temperature', units = 'K', **styles)
-        tempAxis = self.ImpdPlot.plotItem.getAxis('bottom')
-        tempAxis.autoSIPrefix = False
         self.ImpdPlot.addLegend()
         mintemp = min(self.startTemp.value(),self.stopTemp.value())
         maxtemp = max(self.startTemp.value(),self.stopTemp.value())
         self.ImpdPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
         self.TFPlots = []
-        self.tempData = [fdata[-1]]
+        self.tempData = [fdata[-2]]
         self.freqData = fdata[0]
         self.zData = vstack(fdata[1])
         l = len(self.freqData)
@@ -661,7 +667,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
         with open(self.sampleID_tSweepF, 'w') as f:
             f.write("AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
-            f.write("Temperature (K)")
+            f.write("Temperature(K)\tΔT(K)")
             for freq in self.freqData:
                 if freq<1e3:
                     text = '\t{:.2f}Hz'.format(freq)
@@ -672,17 +678,17 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 f.write(text)
             f.write('\n')
             line = array((fdata[1]))
-            line = concatenate(([fdata[-1]],line))
+            line = concatenate(([fdata[-2]],[fdata[-1]],line))
             savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
             f.write('\n')
         
     def plotTsweepData(self, data):
-        self.tempData.append(data[-1])
+        self.tempData.append(data[-2])
         self.zData = hstack((self.zData,vstack(data[0])))
         for i in self.plotPoints:
             self.TFPlots[i].setData(self.tempData,self.zData[i])
         line = array((data[0]))
-        line = concatenate(([data[-1]],line))
+        line = concatenate(([data[-2]],[data[-1]],line))
         with open(self.sampleID_tSweepF, 'a') as f:
             savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
             f.write('\n')
@@ -707,7 +713,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         reply = QtGui.QMessageBox.question(self, 'Confirm Exit',
                                            quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
         if reply == QtGui.QMessageBox.Yes:
-            # TODO: Close all instrument connections
+            self.Impd.close()
+            self.TCont.close()
+            # TODO: Close all connected instruments (Other multimeters? multiplexer)
             if self.TFsweepRun:
                 self.tSweepWorker.stopcall.emit()
             if self.FsweepRun:

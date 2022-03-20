@@ -198,6 +198,7 @@ class ChinoKP1000C(object):
     # def continue_program(self):
 
     # def run_program(self):
+            #TODO: make wait time a user defined parameter
 
     # def stop_program(self):
 

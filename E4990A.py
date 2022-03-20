@@ -6,7 +6,7 @@ Created on Mon Mar  7 17:07:10 2022
 """
 
 from pymeasure.instruments import Instrument
-from pymeasure.instruments.validators import strict_discrete_set, strict_range
+from pymeasure.instruments.validators import strict_range
 from pyvisa.errors import VisaIOError
 from time import sleep
 from random import randint, uniform
@@ -772,5 +772,45 @@ class KeysightE44990A(Instrument):
     
     def setVdc(self):
         self.write(":SOUR1:BIAS:VOLT {}".format(self.Vdc))
+    
+    def show4SplitDisplay(self):
+        self.write(':DISP:SPL D12_34')
+    
+    def activateChannel(self):
+        """
+        Syntax
+        :DISPlay:WINDow<Ch>:ACTivate
+
+        Description
+        This command specifies the active channel. You can set only a channel displayed to the active channel. If this object is used to set a channel not displayed to the active channel, an error occurs when executed and the object is ignored.
+
+        Use :CALC:PAR:SEL to activate the trace.
+
+        Examples
+
+
+        Returns
+        -------
+        None.
+
+        """
+        self.write(":DISP:WIND:ACT")
+    
+    def setMeasurementSpeed(self,value):
+        # This command sets/gets the measurement speed. 1 is the fastest setting, 5 is slowest.
+        try:
+            if 1 <= value <= 5:
+                self.write(":SENS1:APER {}".format(value))
+        except:
+            pass
+    
+    def setPointAveragingFactor(self,value):
+        ans = int(float(self.ask(":SENS1:AVER?")))
+        if ans == 0:
+            self.write(":SENS1:AVER ON") # enable point average
+        self.write(":SENS1:AVER:COUN {}".format(value))
+    
+    def 
         
-        
+    
+    

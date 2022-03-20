@@ -10,21 +10,17 @@ from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
 from copy import copy
 from re import sub
-from PyQt5.QtCore import QObject, QTimer, QEventLoop, pyqtSignal
-from PyQt5.QtWidgets import QTimeEdit, QSpinBox
+from PyQt5.QtCore import QObject, pyqtSignal
 from math import log10
-from numpy import logspace, linspace, diff, array, append, concatenate
+from numpy import logspace, linspace, array, append, concatenate
 from time import sleep
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
 from random import randint, uniform
-from time import sleep
-from PyQt5.QtCore import pyqtSignal
 from math import ceil
 from chino import ChinoKP1000C
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
-
 
 class FakeAdapter():
     """Provides a fake adapter for debugging purposes.
@@ -388,6 +384,7 @@ class FrequencySweepWorker(QObject):
     finished = pyqtSignal()
     data = pyqtSignal(list)
     stopcall = pyqtSignal()
+    showStatus = pyqtSignal(str)
 
     def __init__(self, impd=None):
         super().__init__()
@@ -405,7 +402,6 @@ class FrequencySweepWorker(QObject):
         self.stopCall = True
 
     def start_frequency_sweep(self):
-        # TODO add option to set DC bias also
         self.impd.trig_from_PC()
         self.impd.write(":INIT1:CONT ON")
         if self.spacing == 0:   # set sweep type
@@ -444,12 +440,14 @@ class FrequencySweepWorker(QObject):
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
+        self.showStatus.emit("Started frequency sweep, please wait..")
         self.impd.start_fSweep()
         # TODO: Set the display on the instrument as desired
         self.impd.wait_to_complete()
         measuredData = self.impd.read_measurement_data()
         frequencyData = self.impd.get_frequencies()
         wholedata = [frequencyData,measuredData]
+        self.showStatus.emit("Frequency sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()
 
@@ -480,29 +478,29 @@ class TemperatureSweepWorkerF(QObject):
         self.impd.stopCall = True
 
     def start_temperature_sweep(self):
-        # TODO add option to set DC bias also
-        # TODO: the last temperature point is not being saved.
         self.TCont.temp = self.TCont.startT
         # wait till present temperature reaches start temperature
-        self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
-        while abs(self.TCont.temp-self.TCont.startT) < 2:
-            if self.stopCall == True:
-                self.TCont.reset()
-                self.showStatus.emit("Aborted")
-                break
-            sleep(2)
-        self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
-        count = 0
-        # wait to stabilize at the start temperature
-        #TODO: make wait time a user defined parameter
-        waitCount = self.TCont.stabilizationTime*60/2
-        while count < waitCount: # write 300 to make wait time as 10 minutes
-            if self.stopCall == True:
-                self.TCont.reset()
-                self.showStatus.emit("Aborted")
-                break
-            count += 1
-            sleep(2)
+        while abs(self.TCont.temp-self.TCont.startT) > 1:
+            self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
+            while abs(self.TCont.temp-self.TCont.startT) > 2:
+                if self.stopCall == True:
+                    self.TCont.reset()
+                    self.showStatus.emit("Temperature sweep aborted before start.")
+                    self.finished.emit()
+                    return
+                sleep(2)
+            self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
+            count = 0
+            # wait to stabilize at the start temperature
+            waitCount = self.TCont.stabilizationTime*60/2
+            while count < waitCount: # write 300 to make wait time as 10 minutes
+                if self.stopCall == True:
+                    self.TCont.reset()
+                    self.showStatus.emit("Temperature sweep aborted before start.")
+                    self.finished.emit()
+                    return
+                count += 1
+                sleep(2)
         self.showStatus.emit("Measuring..")
         self.impd.write(":INIT1:CONT ON")
         self.impd.trig_from_PC()
@@ -551,7 +549,6 @@ class TemperatureSweepWorkerF(QObject):
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
         if self.TCont.mode in (0,1):
-            print(self.TCont.startT,self.TCont.stopT,self.TCont.rate)
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
             while self.TCont.isRunning():
@@ -562,6 +559,7 @@ class TemperatureSweepWorkerF(QObject):
                     measuredData = self.impd.read_measurement_data()
                     sweepFinalTemperature = self.TCont.temp
                     averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                    deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
                 else:
                     smallTemp = min(TempList[tcount],TempList[tcount+1])
                     largeTemp = max(TempList[tcount],TempList[tcount+1])
@@ -571,26 +569,26 @@ class TemperatureSweepWorkerF(QObject):
                         measuredData = self.impd.read_measurement_data()
                         sweepFinalTemperature = self.TCont.temp
                         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                        deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
                         tcount += 1
                         if tcount+1 >= len(TempList):
                             self.TCont.reset()
-                            self.data.emit([measuredData,averageTemperature])
-                            self.showStatus.emit("Finshed")
+                            self.data.emit([measuredData,averageTemperature,deltaT])
                             break
                     else:
                         continue
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
-                    self.freqSig.emit([frequencyData,measuredData,averageTemperature])
+                    self.freqSig.emit([frequencyData,measuredData,averageTemperature,deltaT])
                     self.TCont.tCount += 1
                 else:
-                    self.data.emit([measuredData,averageTemperature])
+                    self.data.emit([measuredData,averageTemperature,deltaT])
                 if self.stopCall == True:
                     self.TCont.reset()
-                    self.showStatus.emit("Aborted")
+                    self.showStatus.emit("Temperature sweep aborted. Partial data saved.")
                     break
             if self.stopCall == False:
-                self.showStatus.emit("Finshed")
+                self.showStatus.emit("Temperature sweep complete. Data saved.")
             self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):
