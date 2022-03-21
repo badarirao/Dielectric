@@ -25,7 +25,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 import sys, os
 from PyQt5 import QtWidgets, QtGui
 from dielectric import Ui_ImpedanceApp
-from pyqtgraph import mkPen, intColor
+from pyqtgraph import mkPen, intColor, ViewBox, PlotDataItem
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
 from pandas import DataFrame, Series, concat
@@ -43,6 +43,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def __init__(self, *args, obj=None, **kwargs):
         super(mainControl, self).__init__(*args, **kwargs)
         self.setupUi(self)
+        self.leftPlot = self.ImpdPlot.plotItem
+        self.rightPlot = ViewBox()
+        self.leftPlot.scene().addItem(self.rightPlot)
+        self.leftPlot.getAxis('right').linkToView(self.rightPlot)
+        self.rightPlot.setXLink(self.leftPlot)
+        self.updateViews()
+        self.leftPlot.vb.sigResized.connect(self.updateViews)
+        #self.rightPlot.hide()
         self.checkPaths()
         self.fixFreq.clicked.connect(self.freqOption)
         self.fixTemp.clicked.connect(self.tempOption)
@@ -74,6 +82,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.setFixedACV.clicked.connect(self.setACVolts)
         self.setFixedDCV.clicked.connect(self.setDCVolts)
         self.saveDir.clicked.connect(self.chooseSaveDir)
+        self.choosePlot.currentIndexChanged.connect(self.updatePlotOption)
+        self.phaseButton.clicked.connect(self.phasePlot)
+        self.lossButton.clicked.connect(self.lossPlot)
         self.filenameText.editingFinished.connect(self.setFileName)
         self.setFileName(1)
         self.measureModeSet()
@@ -82,12 +93,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         freqAxis.autoSIPrefix = False
         self.temperatures = []
-        self.plotIndex = 2
+        self.plotIndex = 2 # 0 - z, 1 - z+phase, 2- C, 3-C+loss
         self.freqsweep = True
         self.idleRun = False
         self.TFsweepRun = False
         self.FsweepRun = False
-        self.finished = True
+        self.finished = False
+        self.updatePlotOption()
+        self.currentView = 0 # 0: Frequency Sweep, 1: Temperature Sweep, 2: DC Bias sweep, 3: AC amplitude sweep...
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
@@ -95,6 +108,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
+        self.finished = True
         self.continuousDisplay()
         """ Display list of custom temperatures, which can be edited
         self.Form = QtWidgets.QWidget()
@@ -497,11 +511,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep
                 self.startFreqSweepThread()
                 self.FsweepRun = True
+                self.currentView = 0
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked(): # temperature sweep
                 self.filenameText.setEnabled(False)
                 self.saveDir.setEnabled(False)
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
+                self.currentView = 1
         else:
             self.statusBar().showMessage("No sweep program selected.")
             self.stopProgram()
@@ -521,7 +537,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.freqthread.start()
         self.initialize_frequencySweep_plot()
     
-    def initialize_frequencySweep_plot(self,yaxis = 'z'):
+    def initialize_frequencySweep_plot(self):
         """
         Initialize the plot to display frequency sweep.
 
@@ -531,37 +547,69 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
 
         """
         self.ImpdPlot.clear()
-        
-        styles = {'color': 'r', 'font-size': '20px'}
-        if yaxis == 'z':
-            self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
-        elif yaxis == 'c':
-            self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
-        self.ImpdPlot.setLabel('bottom', 'Frequency', units = 'Hz', **styles)
+        self.rightPlot.clear()
+        styles = {'color': (0, 0, 0), 'font-size': '20px'}
+        self.leftPlot.setLabel('bottom', 'Frequency', units = 'Hz', **styles)
         if self.spacingType.currentIndex() == 0:
-            self.ImpdPlot.setLogMode(False, False)
-            self.ImpdPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
+            self.leftPlot.setLogMode(False, False)
+            self.leftPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
             #self.ImpdPlot.getAxis('bottom').setLogMode(False)
         else:
-            self.ImpdPlot.setLogMode(True, False)
-            self.ImpdPlot.setRange(xRange=(log10(self.impd.endf), log10(self.impd.startf)), padding=0.05)
+            self.leftPlot.setLogMode(True, False)
+            self.leftPlot.setRange(xRange=(log10(self.impd.endf), log10(self.impd.startf)), padding=0.05)
         self.ImpdPlot.addLegend()
         
-    def plotFsweepData(self,data):
-        pen1 = mkPen('b', width=2)
-        fdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
-        self.frequency_sweep_data = DataFrame(fdata,columns=['Frequency(Hz)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
-        self.ImpdPlot.plot(data[0], data[self.plotIndex+1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
-        try:
-            temperature = data[-2]
-            deltaT = data[-1]
-        except:
-            temperature = 'NA'
-            deltaT = 0
-        # Save the data to file
-        with open(self.sampleID_fSweep, 'w') as f:
-            f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}\n\n".format(self.impd.Vac, self.impd.Vdc, temperature, deltaT))
-            self.frequency_sweep_data.to_csv(f,index=False)
+    def plotFsweepData(self,data=-1):
+        if data != -1:
+            fdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
+            self.frequency_sweep_data = DataFrame(fdata,columns=['Frequency(Hz)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
+            try:
+                temperature = data[-2]
+                deltaT = data[-1]
+            except:
+                temperature = 'NA'
+                deltaT = 0
+            # Save the data to file
+            with open(self.sampleID_fSweep, 'w') as f:
+                f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}\n\n".format(self.impd.Vac, self.impd.Vdc, temperature, deltaT))
+                self.frequency_sweep_data.to_csv(f,index=False)
+        else:
+            self.ImpdPlot.clear()
+            self.rightPlot.clear()
+        if self.plotIndex in (0,1): # impedance only
+            pen1 = mkPen('b', width=2)
+            pen2 = mkPen('r', width=2)
+            self.leftPlot.plot(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
+            self.rightData = PlotDataItem(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,2], pen=pen2)
+            if self.spacingType.currentIndex() == 0:
+                self.rightData.setLogMode(False, False)
+            else:
+                self.rightData.setLogMode(True, False)
+            self.rightPlot.addItem(self.rightData)
+            if self.plotIndex == 0:
+                self.leftPlot.hideAxis('right')
+                self.rightPlot.hide()
+            else:
+                self.leftPlot.showAxis('right')
+                self.leftPlot.getAxis('right').setLabel('Phase')
+                self.rightPlot.show()
+        elif self.plotIndex in (2,3): #Capacitance only
+            pen1 = mkPen('b', width=2)
+            pen2 = mkPen('b', width=2)
+            self.leftPlot.plot(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,3], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
+            self.rightData = PlotDataItem(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,4], pen=pen2)
+            if self.spacingType.currentIndex() == 0:
+                self.rightData.setLogMode(False, False)
+            else:
+                self.rightData.setLogMode(True, False)
+            self.rightPlot.addItem(self.rightData)
+            if self.plotIndex == 2:
+                self.leftPlot.hideAxis('right')
+                self.rightPlot.hide()
+            else:
+                self.leftPlot.showAxis('right')
+                self.leftPlot.getAxis('right').setLabel('tan(δ)')
+                self.rightPlot.show()
         
     def setFileName(self, initial = 0):
         """
@@ -733,6 +781,72 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #    savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
         #    f.write('\n')
         
+        ## Handle view resizing 
+    def updateViews(self):
+        ## view has resized; update auxiliary views to match
+        self.rightPlot.setGeometry(self.leftPlot.vb.sceneBoundingRect())
+        ## need to re-update linked axes since this was called
+        ## incorrectly while views had different shapes.
+        ## (probably this should be handled in ViewBox.resizeEvent)
+        self.rightPlot.linkedViewChanged(self.leftPlot.vb, self.rightPlot.XAxis)
+    
+    def phasePlot(self):
+        styles = {'color': (0, 170, 127), 'font-size': '20px'}
+        if self.phaseButton.isChecked():
+            self.plotIndex = 1
+            #set phase as y-axis right
+            self.leftPlot.showAxis('right')
+            self.leftPlot.getAxis('right').setLabel('Phase', **styles)
+            self.rightPlot.show()
+        else:
+            self.plotIndex = 0
+            self.leftPlot.getAxis('right').setLabel('', **styles)
+            self.leftPlot.hideAxis('right')
+            self.rightPlot.hide()
+            # hide phase plot
+    
+    def lossPlot(self):
+        styles = {'color': (170, 0, 255), 'font-size': '20px'}
+        if self.lossButton.isChecked():
+            self.plotIndex = 3
+            #set loss as y-axis right
+            self.leftPlot.showAxis('right')
+            self.leftPlot.getAxis('right').setLabel('tan(δ)', **styles)
+            self.rightPlot.show()
+        else:
+            self.plotIndex = 2
+            self.leftPlot.getAxis('right').setLabel('', **styles)
+            self.leftPlot.hideAxis('right')
+            self.rightPlot.hide()
+            # hide loss plot
+    
+    def updatePlotOption(self):
+        if self.choosePlot.currentIndex() == 0:
+            self.phaseButton.show()
+            self.lossButton.hide()
+            if self.phaseButton.isChecked():
+                self.plotIndex = 1
+            else:
+                self.plotIndex = 0
+            styles = {'color': (170, 85, 0), 'font-size': '20px'}
+            self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
+            # hide capacitance and loss plot
+            # display impedance on y-axis left
+        elif self.choosePlot.currentIndex() == 1:
+            self.phaseButton.hide()
+            self.lossButton.show()
+            if self.lossButton.isChecked():
+                self.plotIndex = 3
+            else:
+                self.plotIndex = 2
+            styles = {'color': (0, 0, 255), 'font-size': '20px'}
+            self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
+            # hide impedance and phase plot
+            # display capacitance on y-axis left
+        if self.finished == True:
+            if self.currentView == 0:
+                self.plotFsweepData()
+    
     def stopProgram(self):
         if not self.finished:
             if self.FsweepRun:
