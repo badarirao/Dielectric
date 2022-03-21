@@ -471,28 +471,32 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def startProgram(self):
         #print(self.temptable.model._data)
-        self.idleWorker.stopcall.emit()
+        self.parameterBox.setEnabled(False)
         self.statusBox.setEnabled(False)
         self.stopButton.setEnabled(True)
         self.startButton.setEnabled(False)
         self.FsweepRun = False
         self.TFsweepRun = False
         self.finished = False
-        self.idleRun = False
         if not self.fixFreq.isChecked():
+            self.idleWorker.stopcall.emit()
+            self.idleRun = False
+            self.setFileName()
             self.impd.startf = self.impd.get_absolute_frequency(self.startFreq.value(),self.startFreqUnit.currentIndex())
             self.impd.endf = self.impd.get_absolute_frequency(self.stopFreq.value(),self.stopFreqUnit.currentIndex())
             self.impd.npointsf = self.npoints.value()
             self.impd.sweeptypef = self.spacingType.currentIndex()
-            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked():
+            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep
                 self.startFreqSweepThread()
                 self.FsweepRun = True
-            elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked():
+            elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked(): # temperature sweep
                 self.filenameText.setEnabled(False)
-                self.statusBar().showMessage("Waiting to reach start temperature..")
                 self.saveDir.setEnabled(False)
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
+        else:
+            self.statusBar().showMessage("No sweep program selected.")
+            self.stopProgram()
     
     def startFreqSweepThread(self):
         self.freqthread = QThread()
@@ -575,8 +579,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 index = self.sampleID.rindex('.')
                 self.sampleID = self.sampleID[:index]
             self.filenameText.setText(self.sampleID)
-            self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='txt')
-            self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
+        self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='csv')
+        self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='csv')
         
     def chooseSaveDir(self):
         """
@@ -605,6 +609,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.saveDir.setEnabled(True)
             self.TFsweepRun = False
         self.finished = True
+        self.parameterBox.setEnabled(True)
         self.statusBox.setEnabled(True)
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
@@ -661,22 +666,22 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             pen1 = mkPen(intColor((i+1), values=3), width=2)
             if Fdata < 1e3:
                 freqlabel = "{} Hz".format(round(Fdata,2))
-                header.append('Z{}Hz'.format(round(Fdata,2)))
-                header.append('p{}Hz'.format(round(Fdata,2)))
-                header.append('C{}Hz'.format(round(Fdata,2)))
-                header.append('d{}Hz'.format(round(Fdata,2)))
+                header.append('Z {}Hz'.format(round(Fdata,2)))
+                header.append('p {}Hz'.format(round(Fdata,2)))
+                header.append('C {}Hz'.format(round(Fdata,2)))
+                header.append('d {}Hz'.format(round(Fdata,2)))
             elif 1e6 > Fdata >= 1e3:
                 freqlabel = "{} kHz".format(round(Fdata/1e3,2))
-                header.append('Z{}kHz'.format(round(Fdata/1e3,2)))
-                header.append('p{}kHz'.format(round(Fdata/1e3,2)))
-                header.append('C{}kHz'.format(round(Fdata/1e3,2)))
-                header.append('d{}kHz'.format(round(Fdata/1e3,2)))
+                header.append('Z {}kHz'.format(round(Fdata/1e3,2)))
+                header.append('p {}kHz'.format(round(Fdata/1e3,2)))
+                header.append('C {}kHz'.format(round(Fdata/1e3,2)))
+                header.append('d {}kHz'.format(round(Fdata/1e3,2)))
             elif Fdata >= 1e6:
                 freqlabel = "{} MHz".format(round(Fdata/1e6,2))
-                header.append('Z{}MHz'.format(round(Fdata/1e6,2)))
-                header.append('p{}MHz'.format(round(Fdata/1e6,2)))
-                header.append('C{}MHz'.format(round(Fdata/1e6,2)))
-                header.append('d{}MHz'.format(round(Fdata/1e6,2)))
+                header.append('Z {}MHz'.format(round(Fdata/1e6,2)))
+                header.append('p {}MHz'.format(round(Fdata/1e6,2)))
+                header.append('C {}MHz'.format(round(Fdata/1e6,2)))
+                header.append('d {}MHz'.format(round(Fdata/1e6,2)))
             self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.Data[self.plotIndex][i], pen = pen1))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
@@ -719,14 +724,18 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #    f.write('\n')
         
     def stopProgram(self):
-        if self.FsweepRun:
-            self.fSweepWorker.stopcall.emit()
-        elif self.TFsweepRun:
-            self.tSweepWorker.stopcall.emit()
-        self.continuousDisplay()
+        if not self.finished:
+            if self.FsweepRun:
+                self.fSweepWorker.stopcall.emit()
+            elif self.TFsweepRun:
+                self.tSweepWorker.stopcall.emit()
+            else:
+                self.finished = True
+        self.parameterBox.setEnabled(True)
         self.statusBox.setEnabled(True)
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
+        self.continuousDisplay()
     
     def closeEvent(self, event):
         try:
