@@ -114,7 +114,7 @@ dmypy.json
 .pyre/
 
 # design file
-*.ui
+#*.ui
 
 # measurement data and address file
 *.txt

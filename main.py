@@ -19,8 +19,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
     # If in cryochamber, switch between sample cr1 and cr2
     # If using probe and linkam heater, switch between sample1, 2 and 3
 # TODO: see if you can plot directly from the pandas dataframe
-# TODO: can you update an existng dataframe into the CSV file?
-# TODO: Display capacitance, or impedance according to user choice, and make sure y axis labels are appropriate.
+# TODO: Display capacitance, or impedance according to user choice for temperature sweep, and make sure y axis labels are appropriate.
+# TODO: use the pandas dataframe to plot the temperature sweep data
  
 import sys, os
 from PyQt5 import QtWidgets, QtGui
