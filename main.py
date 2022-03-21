@@ -20,6 +20,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
     # If using probe and linkam heater, switch between sample1, 2 and 3
 # TODO: see if you can plot directly from the pandas dataframe
 # TODO: can you update an existng dataframe into the CSV file?
+# TODO: Display capacitance, or impedance according to user choice, and make sure y axis labels are appropriate.
  
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -31,6 +32,10 @@ from pandas import DataFrame, Series, concat
 from PyQt5.QtCore import QThread
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
+from math import log10
+
+import warnings
+warnings.filterwarnings("ignore")
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -74,6 +79,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.measureModeSet()
         self.tempOption()
         self.show()
+        freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
+        freqAxis.autoSIPrefix = False
         self.temperatures = []
         self.plotIndex = 2
         self.freqsweep = True
@@ -486,6 +493,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.impd.endf = self.impd.get_absolute_frequency(self.stopFreq.value(),self.stopFreqUnit.currentIndex())
             self.impd.npointsf = self.npoints.value()
             self.impd.sweeptypef = self.spacingType.currentIndex()
+            self.ImpdPlot.enableAutoRange()
             if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep
                 self.startFreqSweepThread()
                 self.FsweepRun = True
@@ -523,6 +531,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
 
         """
         self.ImpdPlot.clear()
+        
         styles = {'color': 'r', 'font-size': '20px'}
         if yaxis == 'z':
             self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
@@ -530,13 +539,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
         self.ImpdPlot.setLabel('bottom', 'Frequency', units = 'Hz', **styles)
         if self.spacingType.currentIndex() == 0:
-            self.ImpdPlot.setLogMode(None, None)
+            self.ImpdPlot.setLogMode(False, False)
+            self.ImpdPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
+            #self.ImpdPlot.getAxis('bottom').setLogMode(False)
         else:
-            self.ImpdPlot.setLogMode(True, None)
-        freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
-        freqAxis.autoSIPrefix = False
+            self.ImpdPlot.setLogMode(True, False)
+            self.ImpdPlot.setRange(xRange=(log10(self.impd.endf), log10(self.impd.startf)), padding=0.05)
         self.ImpdPlot.addLegend()
-        self.ImpdPlot.enableAutoRange()
         
     def plotFsweepData(self,data):
         pen1 = mkPen('b', width=2)
@@ -640,7 +649,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
 
         """
         self.ImpdPlot.clear()
-        self.ImpdPlot.setLogMode(None, None)
+        self.ImpdPlot.setLogMode(False, False)
+        #self.ImpdPlot.getAxis('bottom').setLogMode(False)
         styles = {'color': 'r', 'font-size': '20px'}
         if self.yaxis == 'z':
             self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
