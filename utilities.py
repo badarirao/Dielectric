@@ -374,6 +374,7 @@ class IdleWorker(QObject):
         self.TCont.real_data_request()
         t = self.TCont.temp
         self.data.emit([z, p, c, d, t])
+        sleep(1)
 
     
     def initialize(self): # initialize frequency, AC voltage, DC voltage
@@ -389,10 +390,13 @@ class IdleWorker(QObject):
                 self.impd.enable_DC_Bias(True)
             self.impd.setVdc()
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        #self.display_off()
         self.impd.trig_from_internal()
+        
     
     def start(self):
         self.impd.disable_display_update() # disable display update
+        self.impd.display_off()
         self.initialize()
         self.stopCall = False
         while True:
@@ -425,13 +429,15 @@ class FrequencySweepWorker(QObject):
         self.stopCall = True
 
     def start_frequency_sweep(self):
+        sleep(0.1)
         self.impd.trig_from_PC()
-        self.impd.write(":INIT1:CONT ON")
+        self.impd.continuous_measurement()
         if self.spacing == 0:   # set sweep type
             self.impd.write(":SENS1:SWE:TYPE LIN")
         elif self.spacing == 1:
             self.impd.write(":SENS1:SWE:TYPE LOG") 
         elif self.spacing == 2:
+            self.impd.write(":SENS1:SWE:POIN 1500")
             segments = get_linlog_segment_list(self.start, self.end, self.npoints)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
@@ -448,8 +454,7 @@ class FrequencySweepWorker(QObject):
             segCommand = segmentFormat
             for seg in Segments:
                 segCommand += ',' + seg
-            self.impd.write(":SENS1:SWE:TYPE LIN") 
-            self.impd.write(":SENS1:SEGM:DATA {}".format(segCommand)) 
+            self.impd.write(":SENS1:SEGM:DATA {}".format(segCommand))
         if self.spacing != 2:
             self.impd.write(":SENS1:SWE:POIN {}".format(self.npoints+1)) # set number of points
             self.impd.write(":SENS1:FREQ:STAR {}".format(self.start)) # set start frequency
@@ -462,11 +467,11 @@ class FrequencySweepWorker(QObject):
                 self.impd.setVdc()
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
-        self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
+        self.impd.enable_display_update()
+        self.impd.setYAutoScale()
         self.showStatus.emit("Started frequency sweep, please wait..")
         sweepInitialTemperature = self.TCont.temp
         self.impd.start_fSweep()
-        # TODO: Set the display on the instrument as desired
         self.impd.wait_to_complete()
         sweepFinalTemperature = self.TCont.temp
         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
@@ -477,6 +482,7 @@ class FrequencySweepWorker(QObject):
         self.showStatus.emit("Frequency sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()
+        
 
 class TemperatureSweepWorkerF(QObject):
     finished = pyqtSignal()
@@ -552,7 +558,6 @@ class TemperatureSweepWorkerF(QObject):
             segCommand = segmentFormat
             for seg in Segments:
                 segCommand += ',' + seg
-            self.impd.write(":SENS1:SWE:TYPE LIN") 
             self.impd.write(":SENS1:SEGM:DATA {}".format(segCommand)) 
         if self.spacing != 2:
             self.impd.write(":SENS1:SWE:POIN {}".format(self.impd.npointsf+1)) # set number of points

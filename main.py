@@ -33,6 +33,7 @@ from PyQt5.QtCore import QThread
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
 from math import log10
+from time import sleep
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -99,13 +100,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.TFsweepRun = False
         self.FsweepRun = False
         self.finished = False
-        self.updatePlotOption()
         self.currentView = 0 # 0: Frequency Sweep, 1: Temperature Sweep, 2: DC Bias sweep, 3: AC amplitude sweep...
+        self.updatePlotOption()
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
@@ -577,8 +578,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.ImpdPlot.clear()
             self.rightPlot.clear()
         if self.plotIndex in (0,1): # impedance only
-            pen1 = mkPen('b', width=2)
-            pen2 = mkPen('r', width=2)
+            pen1 = mkPen(color = (170, 85, 0), width=2)
+            pen2 = mkPen(color = (0, 170, 127), width=2)
             self.leftPlot.plot(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,1], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
             self.rightData = PlotDataItem(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,2], pen=pen2)
             if self.spacingType.currentIndex() == 0:
@@ -594,8 +595,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.leftPlot.getAxis('right').setLabel('Phase')
                 self.rightPlot.show()
         elif self.plotIndex in (2,3): #Capacitance only
-            pen1 = mkPen('b', width=2)
-            pen2 = mkPen('b', width=2)
+            pen1 = mkPen(color = (0, 0, 255), width=2)
+            pen2 = mkPen(color = (255, 127, 0), width=2)
             self.leftPlot.plot(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,3], name="Vac = {}".format(self.fixedACvolt.value()), pen=pen1)
             self.rightData = PlotDataItem(self.frequency_sweep_data.iloc[:,0], self.frequency_sweep_data.iloc[:,4], pen=pen2)
             if self.spacingType.currentIndex() == 0:
@@ -806,7 +807,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             # hide phase plot
     
     def lossPlot(self):
-        styles = {'color': (170, 0, 255), 'font-size': '20px'}
+        styles = {'color': (255, 127, 0), 'font-size': '20px'}
         if self.lossButton.isChecked():
             self.plotIndex = 3
             #set loss as y-axis right
@@ -821,6 +822,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             # hide loss plot
     
     def updatePlotOption(self):
+        if self.currentView == 0:
+            self.ImpdPlot.enableAutoRange()
+        elif self.currentView == 1:
+            mintemp = min(self.startTemp.value(),self.stopTemp.value())
+            maxtemp = max(self.startTemp.value(),self.stopTemp.value())
+            self.ImpdPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
+            self.ImpdPlot.enableAutoRange(axis='y')
         if self.choosePlot.currentIndex() == 0:
             self.phaseButton.show()
             self.lossButton.hide()
@@ -864,6 +872,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def closeEvent(self, event):
         try:
             self.idleWorker.stopcall.emit()
+            sleep(0.1)
+            self.impd.write(":SENS1:SWE:POIN 50")
+            self.impd.display_on()
+            sleep(0.1)
             self.idleRun = False
         except:
             pass

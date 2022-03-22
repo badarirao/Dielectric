@@ -113,6 +113,8 @@ class KeysightE44990A(Instrument):
         # set DC Bias mode as voltage
         self.write(":SOUR1:BIAS:MODE VOLT")
         self.set_measurement_parameter()
+        self.set_number_of_traces_to_display(4)
+        self.showSplitDisplay()
 
     def initialize(self):
         # initialize the instrument to obtain absolute Z, phase Z, Capacitance, and loss in respective four channels
@@ -291,21 +293,21 @@ class KeysightE44990A(Instrument):
 
         """
         self.write(":Calculate1:Parameter1:Sel")
-        z = self.ask(":Calculate1:Data:Fdat")
+        z = self.ask(":Calculate1:Data:Fdata?")
         z = z.split(',')
         z = [float(x) for i,x in enumerate(z) if i%2==0]
         self.write(":Calculate1:Parameter2:Sel")
-        p = self.ask(":Calculate1:Data:Fdat")
+        p = self.ask(":Calculate1:Data:Fdata?")
         p = p.split(',')
         p = [float(x) for i,x in enumerate(p) if i%2==0]
         sleep(0.1)
         self.write(":Calculate1:Parameter3:Sel")
-        c = self.ask(":Calculate1:Data:Fdat")
+        c = self.ask(":Calculate1:Data:Fdata?")
         c = c.split(',')
         c = [float(x) for i,x in enumerate(c) if i%2==0]
         sleep(0.1)
         self.write(":Calculate1:Parameter4:Sel")
-        d = self.ask(":Calculate1:Data:Fdat")
+        d = self.ask(":Calculate1:Data:Fdata?")
         d = d.split(',')
         d = [float(x) for i,x in enumerate(d) if i%2==0]
         sleep(0.1)
@@ -483,12 +485,24 @@ class KeysightE44990A(Instrument):
         None.
 
         """
-        # set trace 1 to measure absolute impedance Z
+        # set channel 1 trace 1 to measure absolute impedance Z
         self.write(":CALC1:PAR1:DEF Z")
         
-        # set trace 2 to measure impedance phase
-        #self.write(":CALC1:PAR2:DEF TZ")
+        #set channel 1 trace 2 to measure impedance phase
+        self.write(":CALC1:PAR2:DEF TZ")
+        
+        #set channel 2 trace 1 to measure Parallel Capacitance
+        self.write(":CALC1:PAR3:DEF CP")
+        
+        #set channel 2 trace 2 to measure Dissipation Factor
+        self.write(":CALC1:PAR4:DEF D")
     
+    def setYAutoScale(self):
+        self.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
+        self.write(":DISPlay:WINDow1:TRACe2:Y:AUTO")
+        self.write(":DISPlay:WINDow1:TRACe3:Y:AUTO")
+        self.write(":DISPlay:WINDow1:TRACe4:Y:AUTO")
+        
     def set_yAxis_log(self):
         """
         Syntax
@@ -753,26 +767,30 @@ class KeysightE44990A(Instrument):
         """
         self.write(":DISPlay:WINDow1:TRACe1:STATe OFF")
         self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
+        self.write(":DISPlay:WINDow1:TRACe3:STATe OFF")
+        self.write(":DISPlay:WINDow1:TRACe4:STATe OFF")
     
     def display_on(self):
         self.write(":DISPlay:WINDow1:TRACe1:STATe ON")
-        self.write(":DISPlay:WINDow1:TRACe2:STATe OFF")
+        self.write(":DISPlay:WINDow1:TRACe2:STATe ON")
+        self.write(":DISPlay:WINDow1:TRACe3:STATe ON")
+        self.write(":DISPlay:WINDow1:TRACe4:STATe ON")
     
     def get_current_values(self):
         self.write(":Calculate1:Parameter1:Sel")
-        z = self.ask(":Calculate1:Data:Fdat")
+        z = self.ask(":Calculate1:Data:Fdata?")
         z = z.split(',')
         z = float(z[0])
         self.write(":Calculate1:Parameter2:Sel")
-        p = self.ask(":Calculate1:Data:Fdat")
+        p = self.ask(":Calculate1:Data:Fdata?")
         p = p.split(',')
         p = float(p[0])
         self.write(":Calculate1:Parameter3:Sel")
-        c = self.ask(":Calculate1:Data:Fdat")
+        c = self.ask(":Calculate1:Data:Fdata?")
         c = c.split(',')
         c = float(c[0])
         self.write(":Calculate1:Parameter4:Sel")
-        d = self.ask(":Calculate1:Data:Fdat")
+        d = self.ask(":Calculate1:Data:Fdata?")
         d = d.split(',')
         d = float(d[0])
         return z,p,c,d
@@ -809,8 +827,11 @@ class KeysightE44990A(Instrument):
     def setVdc(self):
         self.write(":SOUR1:BIAS:VOLT {}".format(self.Vdc))
     
-    def show4SplitDisplay(self):
-        self.write(':DISP:SPL D12_34')
+    def set_number_of_traces_to_display(self,value=4):
+        self.write(":CALC1:PAR:COUN {}".format(value))
+    
+    def showSplitDisplay(self):
+        self.write(':DISP:WIND1:SPL D1_2')
     
     def activateChannel(self):
         """
