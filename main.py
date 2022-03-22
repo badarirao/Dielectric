@@ -20,8 +20,10 @@ self.ImpdPlot.setBackground((255,182,193,25))
     # If using probe and linkam heater, switch between sample1, 2 and 3
 # TODO: see if you can plot directly from the pandas dataframe
 # TODO: Display capacitance, or impedance according to user choice for temperature sweep, and make sure y axis labels are appropriate.
+# TODO: Display phase or loss according to user choice
 # TODO: use the pandas dataframe to plot the temperature sweep data
-# Plot x and y-axis labels font color and size has not changed.
+# TODO: During idle Display, check if setting fixed frequency is working
+
  
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -210,6 +212,15 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.updateStartTemp()
         self.updateStopTemp()
         self.updateRateTemp()
+        # Format bottom axis
+        styles = {'color': (0, 0, 0), 'font-size': '20px'}
+        pen = mkPen(color = (0, 0, 0), width=2)
+        font = QtGui.QFont("Roman times", 11)
+        self.leftPlot.setLabel('bottom', 'Frequency', units = 'Hz',**styles)
+        self.leftPlot.getAxis('bottom').setPen(pen)
+        self.leftPlot.getAxis('bottom').setTickFont(font)
+        self.leftPlot.setLogMode(True, False)
+        self.leftPlot.setRange(xRange=(log10(20), log10(1e7)), padding=0.05)
     
     def updateStartTemp(self):
         self.TCont.startT = self.startTemp.value()
@@ -551,7 +562,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.clear()
         self.rightPlot.clear()
         styles = {'color': (0, 0, 0), 'font-size': '20px'}
-        self.leftPlot.setLabel('bottom', 'Frequency', units = 'Hz', **styles)
+        pen = mkPen(color = (0, 0, 0), width=2)
+        font = QtGui.QFont("Roman times", 11)
+        self.leftPlot.setLabel('bottom', 'Frequency', units = 'Hz',**styles)
+        self.leftPlot.getAxis('bottom').setPen(pen)
+        self.leftPlot.getAxis('bottom').setTickFont(font)
         if self.spacingType.currentIndex() == 0:
             self.leftPlot.setLogMode(False, False)
             self.leftPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
@@ -701,28 +716,28 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.clear()
         self.ImpdPlot.setLogMode(False, False)
         #self.ImpdPlot.getAxis('bottom').setLogMode(False)
-        styles = {'color': 'r', 'font-size': '20px'}
-        if self.yaxis == 'z':
-            self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
-        elif self.yaxis == 'c':
-            self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
-        self.ImpdPlot.setLabel('bottom', 'Temperature', units = 'K', **styles)
+        styles = {'color': 'b', 'font-size': '20px'}
+        pen = mkPen(color = (0, 0, 0), width=2)
+        font = QtGui.QFont("Roman times", 11)
+        self.leftPlot.setLabel('bottom', 'Temperature', units = 'K', **styles)
+        self.leftPlot.getAxis('bottom').setPen(pen)
+        self.leftPlot.getAxis('bottom').setTickFont(font)
         self.ImpdPlot.addLegend()
         mintemp = min(self.startTemp.value(),self.stopTemp.value())
         maxtemp = max(self.startTemp.value(),self.stopTemp.value())
-        self.ImpdPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
+        self.leftPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
         self.TFPlots = []
+        pData = [fdata[-2],fdata[-1]]
+        for i in range(len(fdata[0])):
+            pData.append(fdata[1][i])
+            pData.append(fdata[2][i])
+            pData.append(fdata[3][i])
+            pData.append(fdata[4][i])
         self.tempData = [fdata[-2]]
-        self.freqData = fdata[0]
-        self.zData = vstack(fdata[1])
-        self.pData = vstack(fdata[2])
-        self.cData = vstack(fdata[3])
-        self.dData = vstack(fdata[4])
-        self.Data = [self.zData,self.pData,self.cData,self.dData]
-        l = len(self.freqData)
+        l = len(fdata[0])
         header = ['Temperature(K)', 'ΔT(K)']
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
-        for i,Fdata in enumerate(self.freqData):
+        for i,Fdata in enumerate(fdata[0]):
             pen1 = mkPen(intColor((i+1), values=3), width=2)
             if Fdata < 1e3:
                 freqlabel = "{} Hz".format(round(Fdata,2))
@@ -742,29 +757,22 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 header.append('p {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('C {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('d {}MHz'.format(round(Fdata/1e6,2)))
-            self.TFPlots.append(self.ImpdPlot.plot(self.tempData,self.Data[self.plotIndex][i], pen = pen1))
+            if self.plotIndex in (0,1):
+                leftIndex = 0
+            elif self.plotIndex in (2,3):
+                leftIndex = 2
+            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],[pData[2+leftIndex+i*4]], pen = pen1))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
             else:
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
-        pData = [fdata[-2],fdata[-1]]
-        for i in range(len(fdata[0])):
-            pData.append(fdata[1][i])
-            pData.append(fdata[2][i])
-            pData.append(fdata[3][i])
-            pData.append(fdata[4][i])
         self.dfData = DataFrame(data = [pData],columns=header)
-        with open(self.sampleID_tSweepF, 'w') as f:
+        with open(self.sampleID_tSweepF, 'w',newline='') as f:
             f.write("#AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
             self.dfData.to_csv(f,index=False)
         
     def plotTsweepData(self, data):
         self.tempData.append(data[-2])
-        self.zData = hstack((self.zData,vstack(data[0])))
-        self.pData = hstack((self.pData,vstack(data[1])))
-        self.cData = hstack((self.cData,vstack(data[2])))
-        self.dData = hstack((self.dData,vstack(data[3])))
-        self.Data = [self.zData,self.pData,self.cData,self.dData]
         pData = [data[-2],data[-1]]
         for i in range(len(data[0])):
             pData.append(data[0][i])
@@ -774,8 +782,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.dfRow = Series(pData,self.dfData.columns)
         self.dfData = self.dfData.append(self.dfRow,ignore_index=True)
         rData = DataFrame(data = [pData],columns=self.dfData.columns)
+        if self.plotIndex in (0,1):
+            leftIndex = 0
+            rightIndex = 1
+        elif self.plotIndex in (2,3):
+            leftIndex = 2
+            rightIndex = 3
         for i in self.plotPoints:
-            self.TFPlots[i].setData(self.tempData,self.Data[self.plotIndex][i])
+            self.TFPlots[i].setData(self.dfData.iloc[:,0],self.dfData.iloc[:,2+leftIndex+i*4])
         line = array((data[0]))
         line = concatenate(([data[-2]],[data[-1]],line))
         rData.to_csv(self.sampleID_tSweepF,index=False,mode='a',header=False)
@@ -794,11 +808,15 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def phasePlot(self):
         styles = {'color': (0, 170, 127), 'font-size': '20px'}
+        pen = mkPen(color = (0, 170, 127), width=2)
+        font = QtGui.QFont("Roman times", 11)
         if self.phaseButton.isChecked():
             self.plotIndex = 1
             #set phase as y-axis right
             self.leftPlot.showAxis('right')
             self.leftPlot.getAxis('right').setLabel('Phase', **styles)
+            self.leftPlot.getAxis('right').setPen(pen)
+            self.leftPlot.getAxis('right').setTickFont(font)
             self.rightPlot.show()
         else:
             self.plotIndex = 0
@@ -809,11 +827,15 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def lossPlot(self):
         styles = {'color': (255, 127, 0), 'font-size': '20px'}
+        pen = mkPen(color = (255, 127, 0), width=2)
+        font = QtGui.QFont("Roman times", 11)
         if self.lossButton.isChecked():
             self.plotIndex = 3
             #set loss as y-axis right
             self.leftPlot.showAxis('right')
             self.leftPlot.getAxis('right').setLabel('tan(δ)', **styles)
+            self.leftPlot.getAxis('right').setPen(pen)
+            self.leftPlot.getAxis('right').setTickFont(font)
             self.rightPlot.show()
         else:
             self.plotIndex = 2
@@ -837,8 +859,12 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.plotIndex = 1
             else:
                 self.plotIndex = 0
+            pen = mkPen(color = (170, 85, 0), width=2)
+            font = QtGui.QFont("Roman times", 11)
             styles = {'color': (170, 85, 0), 'font-size': '20px'}
-            self.ImpdPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
+            self.leftPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
+            self.leftPlot.getAxis('left').setPen(pen)
+            self.leftPlot.getAxis('left').setTickFont(font)
             # hide capacitance and loss plot
             # display impedance on y-axis left
         elif self.choosePlot.currentIndex() == 1:
@@ -849,12 +875,19 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             else:
                 self.plotIndex = 2
             styles = {'color': (0, 0, 255), 'font-size': '20px'}
-            self.ImpdPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
+            pen = mkPen(color = (0, 0, 255), width=2)
+            font = QtGui.QFont("Roman times", 11)
+            self.leftPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
+            self.leftPlot.getAxis('left').setPen(pen)
+            self.leftPlot.getAxis('left').setTickFont(font)
             # hide impedance and phase plot
             # display capacitance on y-axis left
         if self.finished == True:
             if self.currentView == 0:
-                self.plotFsweepData()
+                try:
+                    self.plotFsweepData()
+                except AttributeError:
+                    pass
     
     def stopProgram(self):
         if not self.finished:
