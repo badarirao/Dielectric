@@ -28,6 +28,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: If no temperature controller or sensor is detected, disable temperature controller and sensor menu. (only continuous or interval measurement can be made)
 
 # TODO: Option to do temperature scan using custom list of temperatures (enable only if controller is present)
+# TODO: functionalize option for DC bias.
+# TODO: Other sweep functions?
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
