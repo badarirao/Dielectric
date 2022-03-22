@@ -18,13 +18,17 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: If MUX is connected, option to switch sample and do parallel measurements
     # If in cryochamber, switch between sample cr1 and cr2
     # If using probe and linkam heater, switch between sample1, 2 and 3
-# TODO: see if you can plot directly from the pandas dataframe
-# TODO: Display capacitance, or impedance according to user choice for temperature sweep, and make sure y axis labels are appropriate.
-# TODO: Display phase or loss according to user choice
-# TODO: use the pandas dataframe to plot the temperature sweep data
+    # In advanced settings, set an option for sample sweep
 # TODO: During idle Display, check if setting fixed frequency is working
 
- 
+# TODO: If sample is in cryochamber, temperature sensor can be Chino, K195 or advantest
+# TODO: If sample is in cryochamber, save temperature data of all sensors that are available (maybe in a separate file?)
+# TODO: if sample is on linkam, temperature sensor can only be linkam
+# TODO: If sample is in cryochamber, and Chino is not connected, then temperature sensor can still sense from K195 or advntest, and just do a simple monitoring temperature sweep
+# TODO: If no temperature controller or sensor is detected, disable temperature controller and sensor menu. (only continuous or interval measurement can be made)
+
+# TODO: Option to do temperature scan using custom list of temperatures (enable only if controller is present)
+
 import sys, os
 from PyQt5 import QtWidgets, QtGui
 from dielectric import Ui_ImpedanceApp
@@ -70,6 +74,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.stopFreq.valueChanged.connect(self.updateStopFrequency)
         self.stopFreqUnit.currentIndexChanged.connect(self.updateStopFrequency)
         self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
+        self.inst.currentIndexChanged.connect(self.updateTemperatureController)
         self.fixedACvolt.valueChanged.connect(self.updateACVoltage)
         self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
         self.tempTraceback.stateChanged.connect(self.updateTempTraceback)
@@ -221,6 +226,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.leftPlot.getAxis('bottom').setTickFont(font)
         self.leftPlot.setLogMode(True, False)
         self.leftPlot.setRange(xRange=(log10(20), log10(1e7)), padding=0.05)
+        self.plotView = self.choosePlot.view()
+        self.plotView.setRowHidden(1,True)
+        self.plotView.setRowHidden(3,True)
+        self.TsensorView = self.sensor.view()
+        self.updateTemperatureController()
     
     def updateStartTemp(self):
         self.TCont.startT = self.startTemp.value()
@@ -238,9 +248,23 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.impd.Vac = self.fixedACvolt.value()
         
     def updateFixedTemperature(self):
-        pass
-        #self.TCont.temp = self.fixedTemp.value()
+        self.TCont.temp = self.fixedTemp.value()
         
+    def updateTemperatureController(self):
+        if self.inst.currentIndex() == 0:
+            if self.sensor.currentIndex() == 1:
+                self.sensor.setCurrentIndex(0)
+            self.TsensorView.setRowHidden(1,True)
+            self.TsensorView.setRowHidden(0,False)
+            self.TsensorView.setRowHidden(2,False)
+            self.TsensorView.setRowHidden(3,False)
+        elif self.inst.currentIndex() == 1:
+            self.sensor.setCurrentIndex(1)
+            self.TsensorView.setRowHidden(0,True)
+            self.TsensorView.setRowHidden(2,True)
+            self.TsensorView.setRowHidden(3,True)
+            self.TsensorView.setRowHidden(1,False)
+     
     def updateStartFrequency(self):
         multiply = 1
         if self.startFreqUnit.currentIndex() == 0:
@@ -351,7 +375,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.freqsweep = True
     
     def tempOption(self):
-        if self.fixTemp.isChecked() == True:
+        if self.fixTemp.isChecked() == True and self.temperatureBox.isChecked():
             self.fixedTemp.setEnabled(True)
             self.setFixedTemperature.setEnabled(True)
             self.startTemp.setEnabled(False)
@@ -415,6 +439,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.voltagePointsLabel.setEnabled(False)
             self.voltageNpoints.setEnabled(False)
             self.traceback.setEnabled(False)
+            self.fixTemp.setEnabled(True)
+            if not self.temperatureBox.isChecked():
+                self.temperatureBox.setChecked(True)
+                self.temperatureBox.setChecked(False)
         else:
             if not self.fixFreq.isChecked():
                 self.lastfreqstate = 'sweep'
@@ -431,6 +459,17 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.voltagePointsLabel.setEnabled(True)
             self.voltageNpoints.setEnabled(True)
             self.traceback.setEnabled(True)
+            
+            # disable temperature sweep option
+            tbox = True
+            if not self.temperatureBox.isChecked():
+                self.temperatureBox.setChecked(True)
+                tbox = False
+            self.fixTemp.setChecked(True)
+            self.tempOption()
+            self.fixTemp.setEnabled(False)
+            if not tbox:
+                self.temperatureBox.setChecked(False)
         self.setVoltageCycles()
         
     def loadTemperatures(self):
@@ -559,6 +598,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         None.
 
         """
+        self.plotView.setRowHidden(1,True)
+        self.plotView.setRowHidden(3,True)
+        self.phaseButton.setEnabled(True)
+        self.lossButton.setEnabled(True)
         self.ImpdPlot.clear()
         self.rightPlot.clear()
         styles = {'color': (0, 0, 0), 'font-size': '20px'}
@@ -713,7 +756,12 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         None.
 
         """
+        self.plotView.setRowHidden(1,False)
+        self.plotView.setRowHidden(3,False)
+        self.phaseButton.setEnabled(False)
+        self.lossButton.setEnabled(False)
         self.ImpdPlot.clear()
+        self.rightPlot.clear()
         self.ImpdPlot.setLogMode(False, False)
         #self.ImpdPlot.getAxis('bottom').setLogMode(False)
         styles = {'color': 'b', 'font-size': '20px'}
@@ -757,46 +805,32 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 header.append('p {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('C {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('d {}MHz'.format(round(Fdata/1e6,2)))
-            if self.plotIndex in (0,1):
-                leftIndex = 0
-            elif self.plotIndex in (2,3):
-                leftIndex = 2
-            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],[pData[2+leftIndex+i*4]], pen = pen1))
+            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],[pData[2+self.plotIndex+i*4]], pen = pen1))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
             else:
-                self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name=freqlabel)
+                self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name = freqlabel)
         self.dfData = DataFrame(data = [pData],columns=header)
         with open(self.sampleID_tSweepF, 'w',newline='') as f:
             f.write("#AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
             self.dfData.to_csv(f,index=False)
         
-    def plotTsweepData(self, data):
-        self.tempData.append(data[-2])
-        pData = [data[-2],data[-1]]
-        for i in range(len(data[0])):
-            pData.append(data[0][i])
-            pData.append(data[1][i])
-            pData.append(data[2][i])
-            pData.append(data[3][i])
-        self.dfRow = Series(pData,self.dfData.columns)
-        self.dfData = self.dfData.append(self.dfRow,ignore_index=True)
-        rData = DataFrame(data = [pData],columns=self.dfData.columns)
-        if self.plotIndex in (0,1):
-            leftIndex = 0
-            rightIndex = 1
-        elif self.plotIndex in (2,3):
-            leftIndex = 2
-            rightIndex = 3
+    def plotTsweepData(self, data=-1):
+        if data != -1:
+            self.tempData.append(data[-2])
+            pData = [data[-2],data[-1]]
+            for i in range(len(data[0])):
+                pData.append(data[0][i])
+                pData.append(data[1][i])
+                pData.append(data[2][i])
+                pData.append(data[3][i])
+            self.dfRow = Series(pData,self.dfData.columns)
+            self.dfData = self.dfData.append(self.dfRow,ignore_index=True)
+            rData = DataFrame(data = [pData],columns=self.dfData.columns)
+            rData.to_csv(self.sampleID_tSweepF,index=False,mode='a',header=False)
         for i in self.plotPoints:
-            self.TFPlots[i].setData(self.dfData.iloc[:,0],self.dfData.iloc[:,2+leftIndex+i*4])
-        line = array((data[0]))
-        line = concatenate(([data[-2]],[data[-1]],line))
-        rData.to_csv(self.sampleID_tSweepF,index=False,mode='a',header=False)
-        #with open(self.sampleID_tSweepF, 'a') as f:
-        #    savetxt(f,line,newline = '\t', delimiter='',fmt='%g')
-        #    f.write('\n')
-        
+            self.TFPlots[i].setData(self.dfData.iloc[:,0],self.dfData.iloc[:,2+self.plotIndex+i*4])
+                
         ## Handle view resizing 
     def updateViews(self):
         ## view has resized; update auxiliary views to match
@@ -845,6 +879,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             # hide loss plot
     
     def updatePlotOption(self):
+        font = QtGui.QFont("Roman times", 11)
         if self.currentView == 0:
             self.ImpdPlot.enableAutoRange()
         elif self.currentView == 1:
@@ -855,37 +890,52 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         if self.choosePlot.currentIndex() == 0:
             self.phaseButton.show()
             self.lossButton.hide()
-            if self.phaseButton.isChecked():
+            if self.phaseButton.isChecked() and self.currentView == 0:
                 self.plotIndex = 1
             else:
                 self.plotIndex = 0
             pen = mkPen(color = (170, 85, 0), width=2)
-            font = QtGui.QFont("Roman times", 11)
             styles = {'color': (170, 85, 0), 'font-size': '20px'}
             self.leftPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
             self.leftPlot.getAxis('left').setPen(pen)
             self.leftPlot.getAxis('left').setTickFont(font)
             # hide capacitance and loss plot
             # display impedance on y-axis left
-        elif self.choosePlot.currentIndex() == 1:
+        elif self.choosePlot.currentIndex() == 2:
             self.phaseButton.hide()
             self.lossButton.show()
-            if self.lossButton.isChecked():
+            if self.lossButton.isChecked() and self.currentView == 0:
                 self.plotIndex = 3
             else:
                 self.plotIndex = 2
             styles = {'color': (0, 0, 255), 'font-size': '20px'}
             pen = mkPen(color = (0, 0, 255), width=2)
-            font = QtGui.QFont("Roman times", 11)
             self.leftPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
             self.leftPlot.getAxis('left').setPen(pen)
             self.leftPlot.getAxis('left').setTickFont(font)
             # hide impedance and phase plot
             # display capacitance on y-axis left
+        elif self.choosePlot.currentIndex() == 1:
+            styles = {'color': (0, 0, 255), 'font-size': '20px'}
+            pen = mkPen(color = (0, 170, 127), width=2)
+            self.leftPlot.setLabel('left', 'Phase', units = '', **styles)
+            self.plotIndex = 1
+        elif self.choosePlot.currentIndex() == 3:
+            styles = {'color': (0, 0, 255), 'font-size': '20px'}
+            pen = mkPen(color = (255, 127, 0), width=2)
+            self.leftPlot.setLabel('left', 'tan(δ)', units = '', **styles)
+            self.plotIndex = 3
+        self.leftPlot.getAxis('left').setPen(pen)
+        self.leftPlot.getAxis('left').setTickFont(font)
         if self.finished == True:
             if self.currentView == 0:
                 try:
                     self.plotFsweepData()
+                except AttributeError:
+                    pass
+            elif self.currentView == 1:
+                try:
+                    self.plotTsweepData()
                 except AttributeError:
                     pass
     

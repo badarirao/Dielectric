@@ -22,9 +22,6 @@ from chino import ChinoKP1000C
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
-# TODO: FakeImpd should return all four parameters during freq sweep
-# TODO: FakeTempController should return all four parameters during temperature sweep
-
 class FakeAdapter():
     """Provides a fake adapter for debugging purposes.
 
