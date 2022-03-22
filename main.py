@@ -21,6 +21,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: see if you can plot directly from the pandas dataframe
 # TODO: Display capacitance, or impedance according to user choice for temperature sweep, and make sure y axis labels are appropriate.
 # TODO: use the pandas dataframe to plot the temperature sweep data
+# Plot x and y-axis labels font color and size has not changed.
  
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -105,8 +106,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
