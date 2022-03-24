@@ -519,8 +519,32 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.DCvoltStatus.setText("{} V".format(self.impd.Vdc))
         
     def showStatus(self, data):
-        self.ZReStatus.setText("{} Ω".format(data[0]))
-        self.ZImStatus.setText("{}".format(data[1]))
+        self.ZImStatus.setText("{}".format(round(data[1],3)))
+        ZAbs = data[0]
+        if ZAbs >= 1e9:
+            ZUnit = 'GΩ'
+            ZAbs/=1e6
+        elif 1e9 > ZAbs >= 1e6:
+            ZUnit = 'MΩ'
+            ZAbs/=1e6
+        elif 1e6 > ZAbs >= 1e3:
+            ZUnit = 'kΩ'
+            ZAbs/=1e3
+        elif 1e3 > ZAbs > 0.1:
+            ZUnit = 'Ω'
+        elif 0.1 >= ZAbs > 1e-4:
+            ZUnit = 'mΩ'
+            ZAbs*=1000
+        elif 1e-4 >= ZAbs:
+            ZUnit = 'μΩ'
+            ZAbs*=1e6
+        elif 1e-7 >= ZAbs > 1e-10:
+            ZUnit = 'nF'
+            ZAbs*=1e9
+        elif 1e-10 >= ZAbs:
+            ZUnit = 'pF'
+            ZAbs*=1e12
+        self.ZReStatus.setText("{0} {1}".format(round(ZAbs,3),ZUnit))
         capacitance = data[2]
         if capacitance > 0.1:
             capUnit = 'F'

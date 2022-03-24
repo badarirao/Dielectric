@@ -124,3 +124,9 @@ dmypy.json
 
 # setting file
 *.dnd
+
+# icon file
+*.ico
+
+# batch file
+*.bat
