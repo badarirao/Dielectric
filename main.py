@@ -25,10 +25,10 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Other sweep functions?
 
 # Short Term goals
-# TODO: During idle Display, check if setting fixed frequency is working
-# TODO: functionalize option for DC bias.
-# TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc.
+# TODO: functionalize option for DC bias sweep.
+# TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
 # TODO: Facility to alert by email if any alarm is triggered.
+# Parameters to be modified in advanced section:
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -68,7 +68,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startButton.clicked.connect(self.startProgram)
         self.stopButton.clicked.connect(self.stopProgram)
         self.loadTempButton.clicked.connect(self.loadTemperatures)
-        self.fixedFreq.valueChanged.connect(self.updateFixedFrequency)
+        self.fixedFreq.editingFinished.connect(self.updateFixedFrequency)
         self.fixedFreqUnit.currentIndexChanged.connect(self.updateFixedFrequency)
         self.startFreq.valueChanged.connect(self.updateStartFrequency)
         self.startFreqUnit.currentIndexChanged.connect(self.updateStartFrequency)
@@ -114,8 +114,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
@@ -386,6 +386,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
             self.heatRate.setEnabled(False)
+            self.stabilizationTime.setEnabled(False)
             self.tempTraceback.setEnabled(False)
             self.frame.hide()
             self.loadTempButton.setEnabled(False)
@@ -492,8 +493,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def continuousDisplay(self):
         if not self.idleRun and self.finished:
             self.idleRun = True
-            self.startIdleThread()
             self.showControllerStatus()
+            self.startIdleThread()
         
     def startIdleThread(self):
         self.idlethread = QThread()
@@ -518,8 +519,32 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.DCvoltStatus.setText("{} V".format(self.impd.Vdc))
         
     def showStatus(self, data):
-        self.ZReStatus.setText("{} Ω".format(data[0]))
-        self.ZImStatus.setText("{}".format(data[1]))
+        self.ZImStatus.setText("{}".format(round(data[1],3)))
+        ZAbs = data[0]
+        if ZAbs >= 1e9:
+            ZUnit = 'GΩ'
+            ZAbs/=1e6
+        elif 1e9 > ZAbs >= 1e6:
+            ZUnit = 'MΩ'
+            ZAbs/=1e6
+        elif 1e6 > ZAbs >= 1e3:
+            ZUnit = 'kΩ'
+            ZAbs/=1e3
+        elif 1e3 > ZAbs > 0.1:
+            ZUnit = 'Ω'
+        elif 0.1 >= ZAbs > 1e-4:
+            ZUnit = 'mΩ'
+            ZAbs*=1000
+        elif 1e-4 >= ZAbs:
+            ZUnit = 'μΩ'
+            ZAbs*=1e6
+        elif 1e-7 >= ZAbs > 1e-10:
+            ZUnit = 'nF'
+            ZAbs*=1e9
+        elif 1e-10 >= ZAbs:
+            ZUnit = 'pF'
+            ZAbs*=1e12
+        self.ZReStatus.setText("{0} {1}".format(round(ZAbs,3),ZUnit))
         capacitance = data[2]
         if capacitance > 0.1:
             capUnit = 'F'

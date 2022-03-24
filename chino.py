@@ -52,21 +52,24 @@ class ChinoKP1000C(object):
         self.traceback = False
         self.interval = 1
         self.all_modes_lock()
-        self.real_data_request()
+        #self.real_data_request()
         self.stabilizationTime = 10 # 10 minutes
 
     def read_param(self, param):
         self.write_param(param)
         answer = self.s.read(200).decode('UTF-8')
         sleep(0.1)
-        if answer[0] == ACK:
-            return 'Accepted'
-        elif answer[0] == NAK:
-            return 'Not accepted:', answer[1:3]
-        elif checksum(answer[1:-5]) == answer[-4:-2]:
-            return answer[1:-5]
+        if answer != '':
+            if answer[0] == ACK:
+                return 'Accepted'
+            elif answer[0] == NAK:
+                return 'Not accepted:', answer[1:3]
+            elif checksum(answer[1:-5]) == answer[-4:-2]:
+                return answer[1:-5]
+            else:
+                print("Some Problem in output")
         else:
-            print("Some Problem in output")
+            print("No response!")
 
     def _connect(self):
         # make connection with the device
@@ -88,10 +91,13 @@ class ChinoKP1000C(object):
         sleep(0.1)
         answer = self.s.read(200).decode('UTF-8')
         sleep(0.1)
-        if answer[0] == ACK:
-            print('Accepted')
-        elif answer[0] == NAK:
-            print('Not accepted: error code:', answer[1:3])
+        if answer != '':
+            if answer[0] == ACK:
+                print('Accepted')
+            elif answer[0] == NAK:
+                print('Not accepted: error code:', answer[1:3])
+        else:
+            print('No response!')
         return wanswer
         
     @property
@@ -106,6 +112,8 @@ class ChinoKP1000C(object):
     def real_data_request(self):
         # get current status from the controller
         self.data = self.read_param(' 1, 1,')
+        if not self.data:
+            return None
         # example response: ' 1, 1, 0,0,  276.42,       0,1,2,  0.00,6,       0,0,       0,'
         temp = self.data.split(',')
         self.pattern_no = int(temp[1].replace(" ", ""))
@@ -120,13 +128,14 @@ class ChinoKP1000C(object):
         self.MV1 = float(temp[10].replace(" ", ""))
         self._temp = self.PV
         # TODO: if self.PV is showing out of range, then set self._temp = -1
+        return 1
 
     def get_current_temperature(self):
         self.real_data_request()
         return self.PV
 
     def get_set_temperature(self):
-        self.read_data_request()
+        self.real_data_request()
         return self.SV
 
     def all_modes_lock(self):
@@ -201,14 +210,16 @@ class ChinoKP1000C(object):
     
     def isRunning(self):
         #TODO: verify the value stored in self.status
-        self.real_data_request()
-        if self.status == 0:
-            return True
+        if self.real_data_request() is not None:
+            if self.status == 0:
+                return True
+            else:
+                return False
         else:
             return False
     
     def execution_parameter_request(self):
-        ans = self.ask(' 1, 2,')
+        ans = self.read_param(' 1, 2,')
         return ans
     
     def set_pattern_request(self, pattern_no=1, step_no=0):
@@ -219,7 +230,7 @@ class ChinoKP1000C(object):
         # if step == end, returns pattern no, step no, link dest. pattern, 
         # output in case of END 0 or fixed control
         # if repeat pattern output, returns repeat count
-        ans = self.ask(' 1, 3,{0},{1}'.format(pattern_no,step_no))
+        ans = self.read_param(' 1, 3,{0},{1}'.format(pattern_no,step_no))
         return ans
     
     def mode0_execution_parameter_request(self):
@@ -228,39 +239,39 @@ class ChinoKP1000C(object):
         # Execution Al4, Execution OL, Execution OH, Execution variation limit
         # Execution sensor correction
         # second P, second I, Second D
-        ans = self.ask(' 1, 2,')
+        ans = self.read_param(' 1, 2,')
         return ans
     
     def program_pattern_setting_status_request(self,pattern_no=1):
         # returns pattern no, setting step count (0 = not set)
-        ans = self.ask(' 1, 5,{},'.format(pattern_no))
+        ans = self.read_param(' 1, 5,{},'.format(pattern_no))
         return ans
     
     def device_status_request(self):
         # returns controller/setter, setter, output1, output2, transmission, 
         # time signal, external drive, select pattern, time unit
-        ans = self.ask(' 1, 6,')
+        ans = self.read_param(' 1, 6,')
         return ans
         
     def mode_Lock_status_request(self):
         # returns lock status of each mode
         # FNC key, mode 0, 1, 2, 3, 4, 5, 6, 7, 8
         # 0 = Not locked, 1 = locked
-        ans = self.ask(' 1, 7,')
+        ans = self.read_param(' 1, 7,')
         return ans
     
     def status1_request(self):
         # returns alarm status: Al1, Al2, Al3, Al4, waiting time alarm, error,
         # TS1, TS2, TS3, TS4, TS5
         # Alarm: 00-off, 01= Alarm on, 10 = waiting alarm OFF
-        ans = self.ask(' 1, 8,')
+        ans = self.read_param(' 1, 8,')
         return ans
     
     def status2_request(self):
         # something about running program status:
             # run, stop, reset, end, adv, const. 
             # MAN1, MAN2, wait, AT, FNC key lock, M/s
-        ans = self.ask(' 1, 9,')
+        ans = self.read_param(' 1, 9,')
         return ans
     
     def autoModeSet(self, mode = True, MV1 = 0):
