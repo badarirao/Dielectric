@@ -866,7 +866,7 @@ class Ui_ImpedanceApp(object):
         self.statusBox.setTitle(_translate("ImpedanceApp", "Current Status"))
         self.impedanceReStatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Z (Abs)</span></p></body></html>"))
         self.temperatureStatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Temperature</span></p></body></html>"))
-        self.capacitanceStatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Capacitance</span></p></body></html>"))
+        self.capacitanceStatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Capacitance (Cp)</span></p></body></html>"))
         self.tandstatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">tan(δ)</span></p></body></html>"))
         self.capStatus.setText(_translate("ImpedanceApp", "F"))
         self.frequencyStatusLabel.setText(_translate("ImpedanceApp", "<html><head/><body><p><span style=\" font-size:11pt; font-weight:600;\">Frequency</span></p></body></html>"))

@@ -29,6 +29,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
 # TODO: Facility to alert by email if any alarm is triggered.
 # Parameters to be modified in advanced section:
+# TODO: Monitor actual AC and DC volts applied, and display it
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -45,6 +46,15 @@ from time import sleep
 
 import warnings
 warnings.filterwarnings("ignore")
+
+# creating VLine class
+class VLine(QtWidgets.QFrame):
+  
+    # a simple Vertical line
+    def __init__(self):
+  
+        super(VLine, self).__init__()
+        self.setFrameShape(self.VLine|self.Sunken)
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -114,8 +124,25 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.modeLabel = QtWidgets.QLabel("")
+        self.modeLabel.setText("Simulation mode running")
+        simulation = False
+        self.statusLabel =  QtWidgets.QLabel("")
+        if self.impd.ID == 'Fake' and self.TCont.ID == 'Fake':
+            self.statusLabel.setText('Impedance Analyzer, Temperature Controller not connected.')
+            simulation = True
+        elif self.TCont.ID == 'Fake':
+            self.statusLabel.setText('Temperature Controller not connected.')
+            simulation = True
+        elif self.impd.ID == 'Fake':
+            self.statusLabel.setText('Impedance Analyzer not connected.')
+            simulation = True
+        if simulation == True:
+            self.statusBar().addPermanentWidget(self.modeLabel)
+            self.statusBar().addPermanentWidget(VLine())
+        self.statusBar().addPermanentWidget(self.statusLabel)
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
