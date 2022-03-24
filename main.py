@@ -25,10 +25,10 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Other sweep functions?
 
 # Short Term goals
-# TODO: During idle Display, check if setting fixed frequency is working
-# TODO: functionalize option for DC bias.
-# TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc.
+# TODO: functionalize option for DC bias sweep.
+# TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
 # TODO: Facility to alert by email if any alarm is triggered.
+# Parameters to be modified in advanced section:
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -68,7 +68,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startButton.clicked.connect(self.startProgram)
         self.stopButton.clicked.connect(self.stopProgram)
         self.loadTempButton.clicked.connect(self.loadTemperatures)
-        self.fixedFreq.valueChanged.connect(self.updateFixedFrequency)
+        self.fixedFreq.editingFinished.connect(self.updateFixedFrequency)
         self.fixedFreqUnit.currentIndexChanged.connect(self.updateFixedFrequency)
         self.startFreq.valueChanged.connect(self.updateStartFrequency)
         self.startFreqUnit.currentIndexChanged.connect(self.updateStartFrequency)
@@ -114,8 +114,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
@@ -386,6 +386,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
             self.heatRate.setEnabled(False)
+            self.stabilizationTime.setEnabled(False)
             self.tempTraceback.setEnabled(False)
             self.frame.hide()
             self.loadTempButton.setEnabled(False)
@@ -492,8 +493,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def continuousDisplay(self):
         if not self.idleRun and self.finished:
             self.idleRun = True
-            self.startIdleThread()
             self.showControllerStatus()
+            self.startIdleThread()
         
     def startIdleThread(self):
         self.idlethread = QThread()

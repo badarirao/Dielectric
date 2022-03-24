@@ -362,16 +362,21 @@ class IdleWorker(QObject):
         self.TCont = TCont
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
+        self.impd.setMeasurementSpeed(4)
 
     def stopcalled(self):
         self.stopCall = True
 
     def get_status(self):
+        if self.initFreq != self.impd._freq:
+            sleep(0.1)
+            self.change_frequency()
+            self.initFreq = self.impd._freq
         z, p, c, d = self.impd.get_current_values()
         self.TCont.real_data_request()
         t = self.TCont.temp
         self.data.emit([z, p, c, d, t])
-        sleep(1)
+        sleep(0.5)
 
     
     def initialize(self): # initialize frequency, AC voltage, DC voltage
@@ -390,12 +395,16 @@ class IdleWorker(QObject):
         #self.display_off()
         self.impd.trig_from_internal()
         
+    def change_frequency(self):
+        self.impd.write(":SENS1:FREQ:STAR {}".format(self.impd._freq)) # set start frequency
+        self.impd.write(":SENS1:FREQ:STOP 1e7") # set stop frequency as 10 MHz
     
     def start(self):
         self.impd.disable_display_update() # disable display update
         self.impd.display_off()
         self.initialize()
         self.stopCall = False
+        self.initFreq = self.impd._freq
         while True:
             if self.stopCall == True:
                 break
@@ -421,6 +430,7 @@ class FrequencySweepWorker(QObject):
             self.impd = FakeImpd()
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
+        self.impd.setMeasurementSpeed(2)
 
     def stopcalled(self):
         self.stopCall = True
@@ -502,6 +512,7 @@ class TemperatureSweepWorkerF(QObject):
         self.spacing = self.impd.sweeptypef
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
+        self.impd.setMeasurementSpeed(2)
 
     def stopcalled(self):
         self.stopCall = True
