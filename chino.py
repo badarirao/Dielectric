@@ -84,16 +84,23 @@ class ChinoKP1000C(object):
             for i in mes:
                 print(i, hex(ord(i)))
         self.s.flushInput()
-        answer = self.s.write(bytes(mes, 'UTF-8'))
+        wanswer = self.s.write(bytes(mes, 'UTF-8'))
         sleep(0.1)
-        return answer
-
+        answer = self.s.read(200).decode('UTF-8')
+        sleep(0.1)
+        if answer[0] == ACK:
+            print('Accepted')
+        elif answer[0] == NAK:
+            print('Not accepted: error code:', answer[1:3])
+        return wanswer
+        
     @property
     def temp(self):
         return self._temp
 
     @temp.setter
     def temp(self, value):
+        #FIXED CONTROL
         self.write_param(' 2, 4,1,{0}'.format(value))
 
     def real_data_request(self):
@@ -123,10 +130,18 @@ class ChinoKP1000C(object):
         return self.SV
 
     def all_modes_lock(self):
-        self.read_param(' 2, 7,1,1,1,1,1,1,1,1,1,1,')
+        self.write_param(' 2, 7,1,1,1,1,1,1,1,1,1,1,')
 
     def all_modes_unlock(self):
-        self.read_param(' 2, 7,0,0,0,0,0,0,0,0,0,0,')
+        self.write_param(' 2, 7,0,0,0,0,0,0,0,0,0,0,')
+    
+    def set_time_display_system(self,show=1):
+        # 1-elapsed step, 2-elapsed pattern, 3-remaining steps, 4-remaining pattern
+        self.write_param(' 2, 8,{}'.format(show))
+    
+    def clear_pattern(self,pattern='00'):
+        # 00 - clear all patterns, other wise clear specified pattern number
+        self.write_param(' 3, 8,{}'.format(pattern))
 
     def program_drive(self, task, pattern_no):
         self.write_param(' 2, 1, {0}, {1},'.format(task, pattern_no))
@@ -192,6 +207,96 @@ class ChinoKP1000C(object):
         else:
             return False
     
+    def execution_parameter_request(self):
+        ans = self.ask(' 1, 2,')
+        return ans
+    
+    def set_pattern_request(self, pattern_no=1, step_no=0):
+        # if step = 0, returns pattern_no, 0. start SV, startSV/PV
+        # if step > 0, returns pattern no, step no, SV, Time, Repeat count
+        # PID No., ALM No., OPL No., OSL No., Sensor correction No.,
+        # Waiting time No., TS1, TS2, TS3, TS4, TS5
+        # if step == end, returns pattern no, step no, link dest. pattern, 
+        # output in case of END 0 or fixed control
+        # if repeat pattern output, returns repeat count
+        ans = self.ask(' 1, 3,{0},{1}'.format(pattern_no,step_no))
+        return ans
+    
+    def mode0_execution_parameter_request(self):
+        # returns execution target SV, Execution P, Execution I
+        # Execution D, Execution AL1, Execution AL2, Execution Al3
+        # Execution Al4, Execution OL, Execution OH, Execution variation limit
+        # Execution sensor correction
+        # second P, second I, Second D
+        ans = self.ask(' 1, 2,')
+        return ans
+    
+    def program_pattern_setting_status_request(self,pattern_no=1):
+        # returns pattern no, setting step count (0 = not set)
+        ans = self.ask(' 1, 5,{},'.format(pattern_no))
+        return ans
+    
+    def device_status_request(self):
+        # returns controller/setter, setter, output1, output2, transmission, 
+        # time signal, external drive, select pattern, time unit
+        ans = self.ask(' 1, 6,')
+        return ans
+        
+    def mode_Lock_status_request(self):
+        # returns lock status of each mode
+        # FNC key, mode 0, 1, 2, 3, 4, 5, 6, 7, 8
+        # 0 = Not locked, 1 = locked
+        ans = self.ask(' 1, 7,')
+        return ans
+    
+    def status1_request(self):
+        # returns alarm status: Al1, Al2, Al3, Al4, waiting time alarm, error,
+        # TS1, TS2, TS3, TS4, TS5
+        # Alarm: 00-off, 01= Alarm on, 10 = waiting alarm OFF
+        ans = self.ask(' 1, 8,')
+        return ans
+    
+    def status2_request(self):
+        # something about running program status:
+            # run, stop, reset, end, adv, const. 
+            # MAN1, MAN2, wait, AT, FNC key lock, M/s
+        ans = self.ask(' 1, 9,')
+        return ans
+    
+    def autoModeSet(self, mode = True, MV1 = 0):
+        # MV1 = manual output value
+        if mode == True:
+            self.write(' 2, 3,0, ,0, ,')
+        else:
+            self.write(' 2, 3,1,{},0, ,'.format(MV1))
+    
+    def alarm_cancel_output(self):
+        self.write(' 2, 5,')
+    
+    # AT3 can do automatic PID switching? it is better to try AT3 first
+    # AT2 looks like for specific setpoint stabilization (you can set 8 temperatures)
+    def AT2_SV(self,parameter_number,status,setTemperature):
+        # parameter_number =  1 to 8; 0 --> copy to 1 to 8
+        # status = 0(off) or 1(on)
+        self.write('45,{0},{1},{2}'.format(parameter_number,status,setTemperature))
+    
+    def AT3_SV_section(self,parameter_number,delimiterSV): # AT2 or AT3?
+        # paramter number = 1 to 7
+        self.write('46,{0},{1}'.format(parameter_number,delimiterSV))
+    
+    def AT3_SV(self,parameter_number,status,setTemperature):
+        # parameter_number =  1 to 8; 0 --> copy to 1 to 8
+        # status = 0(off) or 1(on)
+        self.write('47,{0},{1},{2}'.format(parameter_number,status,setTemperature))
+    
+    def AT_start_direction(self,direction):
+        # direction = 0(UP), 1(down)
+        self.write('48,{}'.format(direction))
+    
+    def SV_during_reset(self,value):
+        self.write('49,{}'.format(value))
+    
+        
     def close(self):
         self.s.close()
 
