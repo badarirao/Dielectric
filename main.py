@@ -30,6 +30,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Option to do temperature scan using custom list of temperatures (enable only if controller is present)
 # TODO: functionalize option for DC bias.
 # TODO: Other sweep functions?
+# TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc.
+# TODO: Facility to alert by email if any alarm is triggered.
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -727,6 +729,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.filenameText.setEnabled(True)
             self.saveDir.setEnabled(True)
             self.TFsweepRun = False
+            self.ImpdPlot.enableAutoRange()
         self.finished = True
         self.parameterBox.setEnabled(True)
         self.statusBox.setEnabled(True)
@@ -830,6 +833,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.dfData = self.dfData.append(self.dfRow,ignore_index=True)
             rData = DataFrame(data = [pData],columns=self.dfData.columns)
             rData.to_csv(self.sampleID_tSweepF,index=False,mode='a',header=False)
+        else:
+            self.ImpdPlot.enableAutoRange()
         for i in self.plotPoints:
             self.TFPlots[i].setData(self.dfData.iloc[:,0],self.dfData.iloc[:,2+self.plotIndex+i*4])
                 
