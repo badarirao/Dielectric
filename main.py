@@ -9,27 +9,24 @@ from pyqtgraph import PlotWidget, ViewBox, mkPen
 self.ImpdPlot = PlotWidget(self.centralwidget,viewBox=ViewBox(border = mkPen(color='k',width = 2)))
 self.ImpdPlot.setBackground((255,182,193,25))
 """
-# TODO: Set all tooltips appropriately
-# TODO: set TabOrder correctly
+# Long term goals
 # TODO: Option to just continuously do freqsweep and monitor the temperature (no temperature control)
 # TODO: Option to monitor temperature from other sensors
-# TODO: Check how to efficiently implement idle display. Currently looks like only freq-sweep is possible
-    # in that case, do fsweep of 2 points, and display data of desired freq. Also disable instrument window display
 # TODO: If MUX is connected, option to switch sample and do parallel measurements
     # If in cryochamber, switch between sample cr1 and cr2
     # If using probe and linkam heater, switch between sample1, 2 and 3
     # In advanced settings, set an option for sample sweep
-# TODO: During idle Display, check if setting fixed frequency is working
-
 # TODO: If sample is in cryochamber, temperature sensor can be Chino, K195 or advantest
 # TODO: If sample is in cryochamber, save temperature data of all sensors that are available (maybe in a separate file?)
 # TODO: if sample is on linkam, temperature sensor can only be linkam
 # TODO: If sample is in cryochamber, and Chino is not connected, then temperature sensor can still sense from K195 or advntest, and just do a simple monitoring temperature sweep
 # TODO: If no temperature controller or sensor is detected, disable temperature controller and sensor menu. (only continuous or interval measurement can be made)
-
-# TODO: Option to do temperature scan using custom list of temperatures (enable only if controller is present)
-# TODO: functionalize option for DC bias.
+# TODO: Option to do temperature scan using custom list of temperatures (enable only if controller is present)    
 # TODO: Other sweep functions?
+
+# Short Term goals
+# TODO: During idle Display, check if setting fixed frequency is working
+# TODO: functionalize option for DC bias.
 # TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc.
 # TODO: Facility to alert by email if any alarm is triggered.
 
