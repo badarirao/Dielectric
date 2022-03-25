@@ -123,9 +123,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.updatePlotOption()
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
-        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
+        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
         #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
         self.modeLabel = QtWidgets.QLabel("")
         self.modeLabel.setText("Simulation mode running")
         simulation = False
@@ -142,6 +142,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         if simulation == True:
             self.statusBar().addPermanentWidget(self.modeLabel)
             self.statusBar().addPermanentWidget(VLine())
+        if self.TCont.ID == 'Chino':
+            self.fixedTemp.setValue(20)
         self.statusBar().addPermanentWidget(self.statusLabel)
         self.initializeParameters()
         self.stopButton.setEnabled(False)

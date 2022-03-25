@@ -54,9 +54,10 @@ class ChinoKP1000C(object):
         self.all_modes_lock()
         #self.real_data_request()
         self.stabilizationTime = 10 # 10 minutes
+        self.ID = 'Chino'
 
     def read_param(self, param):
-        self.write_param(param)
+        self.send_read_command(param)
         answer = self.s.read(200).decode('UTF-8')
         sleep(0.1)
         if answer != '':
@@ -80,7 +81,17 @@ class ChinoKP1000C(object):
             print("Error Connecting to the instrument")
             self.s.close()
 
-    def write_param(self, message):
+    def send_read_command(self,command):
+        bcc = checksum(command)
+        mes = STX+command+ETX+bcc+CR+LF
+        if DEBUG:
+            for i in mes:
+                print(i, hex(ord(i)))
+        self.s.flushInput()
+        self.s.write(bytes(mes, 'UTF-8'))
+        sleep(0.1)
+
+    def write_param(self, message,messageDescription="Unknown"):
         bcc = checksum(message)
         mes = STX+message+ETX+bcc+CR+LF
         if DEBUG:
@@ -95,7 +106,7 @@ class ChinoKP1000C(object):
             if answer[0] == ACK:
                 print('Accepted')
             elif answer[0] == NAK:
-                print('Not accepted: error code:', answer[1:3])
+                print('{0} command not accepted: error code: {1}'.format(messageDescription,answer[1:3]))
         else:
             print('No response!')
         return wanswer
@@ -107,7 +118,7 @@ class ChinoKP1000C(object):
     @temp.setter
     def temp(self, value):
         #FIXED CONTROL
-        self.write_param(' 2, 4,1,{0}'.format(value))
+        self.write_param(' 2, 4,1,{0}'.format(value),"setTemperature")
 
     def real_data_request(self):
         # get current status from the controller
@@ -119,7 +130,10 @@ class ChinoKP1000C(object):
         self.pattern_no = int(temp[1].replace(" ", ""))
         self.step_no = int(temp[2].replace(" ", ""))
         self.pv_status = int(temp[3].replace(" ", ""))
-        self.PV = float(temp[4].replace(" ", ""))
+        try:
+            self.PV = float(temp[4].replace(" ", ""))
+        except:
+            self.PV = -1
         self.SV = float(temp[5].replace(" ", ""))
         self.time_display_system = int(temp[6].replace(" ", ""))
         self.time_unit = int(temp[7].replace(" ", "")) # 1 = minute, 2 = Hours, 3 = days
@@ -139,28 +153,28 @@ class ChinoKP1000C(object):
         return self.SV
 
     def all_modes_lock(self):
-        self.write_param(' 2, 7,1,1,1,1,1,1,1,1,1,1,')
+        self.write_param(' 2, 7,1,1,1,1,1,1,1,1,1,1,',"Lock all modes")
 
     def all_modes_unlock(self):
-        self.write_param(' 2, 7,0,0,0,0,0,0,0,0,0,0,')
+        self.write_param(' 2, 7,0,0,0,0,0,0,0,0,0,0,',"Unlock all modes")
     
     def set_time_display_system(self,show=1):
         # 1-elapsed step, 2-elapsed pattern, 3-remaining steps, 4-remaining pattern
-        self.write_param(' 2, 8,{}'.format(show))
+        self.write_param(' 2, 8,{}'.format(show),"Set time display system")
     
     def clear_pattern(self,pattern='00'):
         # 00 - clear all patterns, other wise clear specified pattern number
-        self.write_param(' 3, 8,{}'.format(pattern))
+        self.write_param(' 3, 8,{}'.format(pattern),"Clear pattern")
 
     def program_drive(self, task, pattern_no):
-        self.write_param(' 2, 1, {0}, {1},'.format(task, pattern_no))
+        self.write_param(' 2, 1, {0}, {1},'.format(task, pattern_no),"Program drive")
 
     def set_temperature(self, t):  # temperature t is in Kelvin
-        self.write_param(' 2, 4,1,{0}'.format(t))
+        self.write_param(' 2, 4,1,{0}'.format(t),"Set temperature explicitely")
 
     def auto_tuning(self, tune):
         # tune = 0: stop, 1: AT1 start, 2: AT2 start, 3: AT3 start
-        self.write_param(' 2, 6, {0}'.format(tune))
+        self.write_param(' 2, 6, {0}'.format(tune),"Autotuning")
 
         PN = 1
         onstate = 1
@@ -184,29 +198,30 @@ class ChinoKP1000C(object):
         dirn = 1
         self.write_param('48,{0},'.format(dirn))
 
+    def program_mode(self):
+        self.write_param(' 2, 4,0, ,',"Program mode") # set to program mode
+        
+        
     def rampT(self):
         # maybe go to start temperature first?
-        self.write_param(' 2, 4,0, ,') # set to program mode
+        self.program_mode()
         rampTime = round(abs((self.startT-self.stopT)/self.rate)/60,2)
-        self.write_param(' 3, 1,1,00, ,1,')   # step 0, start from present value
-        self.write_param(' 3, 2,1,01,{0},{1},'.format(self.stopT,rampTime)) # go to stop temperature K at rate k/min rate
+        self.write_param(' 3, 1,1,00, ,1,',"Ramp temperature step 0")   # step 0, start from present value
+        self.write_param(' 3, 2,1,01,{0},{1},'.format(self.stopT,rampTime),"Ramp temperature step 1") # go to stop temperature K at rate k/min rate
         if self.traceback:
-            self.write_param(' 3, 2,1,02,{0},{1},'.format(self.startT,rampTime))  # go to 20K at 5k/min
-            self.write_param(' 3, 3,1,03,00,0,') # end program, and set output to zero
+            self.write_param(' 3, 2,1,02,{0},{1},'.format(self.startT,rampTime),"Ramp temperature step 2")  # go to 20K at 5k/min
+            self.write_param(' 3, 3,1,03,00,0,',"Ramp temperature end step") # end program, and set output to zero
         else:
-            self.write_param(' 3, 3,1,02,00,0,') # end program, and set output to zero
+            self.write_param(' 3, 3,1,02,00,0,',"Ramp temperature end step") # end program, and set output to zero
         
-        self.write_param(' 2, 1,1,01,') # run pattern 1
+        self.write_param(' 2, 1,1,01,',"Start ramp") # run pattern 1
     
-    def clearPattern(self,pattern_no=1):
-        self.write_param(' 3, 8,1,')
-        
     def abort(self):
         # abort pattern 1, programs maintains the current temperature
-        self.write_param(' 2, 1, 2, 01,')
+        self.write_param(' 2, 1,2,1,',"Abort")
         
     def reset(self):
-        self.write_param(' 2, 1, 4, 01,')
+        self.write_param(' 2, 1,4,1,',"Reset")
     
     def isRunning(self):
         #TODO: verify the value stored in self.status
@@ -309,6 +324,9 @@ class ChinoKP1000C(object):
     
         
     def close(self):
+        self.program_mode()
+        self.reset()
+        self.all_modes_unlock()
         self.s.close()
 
     # def continue_program(self):

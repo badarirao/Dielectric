@@ -108,6 +108,7 @@ class KeysightE44990A(Instrument):
         self.endf = 1e7
         self.npointsf = 50
         self.sweeptypef = 1
+        self.ID = "E4990A"
         # set oscillating mode as voltage
         self.write(":SOUR1:MODE VOLT")
         # set DC Bias mode as voltage
