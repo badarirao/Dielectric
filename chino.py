@@ -292,35 +292,35 @@ class ChinoKP1000C(object):
     def autoModeSet(self, mode = True, MV1 = 0):
         # MV1 = manual output value
         if mode == True:
-            self.write(' 2, 3,0, ,0, ,')
+            self.write_param(' 2, 3,0, ,0, ,')
         else:
-            self.write(' 2, 3,1,{},0, ,'.format(MV1))
+            self.write_param(' 2, 3,1,{},0, ,'.format(MV1))
     
     def alarm_cancel_output(self):
-        self.write(' 2, 5,')
+        self.write_param(' 2, 5,')
     
     # AT3 can do automatic PID switching? it is better to try AT3 first
     # AT2 looks like for specific setpoint stabilization (you can set 8 temperatures)
     def AT2_SV(self,parameter_number,status,setTemperature):
         # parameter_number =  1 to 8; 0 --> copy to 1 to 8
         # status = 0(off) or 1(on)
-        self.write('45,{0},{1},{2}'.format(parameter_number,status,setTemperature))
+        self.write_param('45,{0},{1},{2}'.format(parameter_number,status,setTemperature))
     
     def AT3_SV_section(self,parameter_number,delimiterSV): # AT2 or AT3?
         # paramter number = 1 to 7
-        self.write('46,{0},{1}'.format(parameter_number,delimiterSV))
+        self.write_param('46,{0},{1}'.format(parameter_number,delimiterSV))
     
     def AT3_SV(self,parameter_number,status,setTemperature):
         # parameter_number =  1 to 8; 0 --> copy to 1 to 8
         # status = 0(off) or 1(on)
-        self.write('47,{0},{1},{2}'.format(parameter_number,status,setTemperature))
+        self.write_param('47,{0},{1},{2}'.format(parameter_number,status,setTemperature))
     
     def AT_start_direction(self,direction):
         # direction = 0(UP), 1(down)
-        self.write('48,{}'.format(direction))
+        self.write_param('48,{}'.format(direction))
     
     def SV_during_reset(self,value):
-        self.write('49,{}'.format(value))
+        self.write_param('49,{}'.format(value))
     
         
     def close(self):
