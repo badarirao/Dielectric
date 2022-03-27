@@ -268,6 +268,11 @@ def connectDevice(inst, addr, test=False):
 
 
 def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=None, TControlAddr = None, test=False):
+    impd = None
+    mux = None
+    k195 = None
+    Adv = None
+    Tcont = None
     if E4990Addr:
         try:
             impd = KeysightE44990A(E4990Addr)
@@ -282,7 +287,7 @@ def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=No
             Tcont = FakeTempController()
     else:
         Tcont = FakeTempController()
-    return impd, Tcont
+    return impd, mux, k195, Adv, Tcont
     """
     Obtain instrument address of K2450, K2700 and function generator.
 

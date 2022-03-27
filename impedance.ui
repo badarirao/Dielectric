@@ -593,8 +593,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>331</width>
-         <height>801</height>
+         <width>343</width>
+         <height>907</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -2044,7 +2044,7 @@
      <x>0</x>
      <y>0</y>
      <width>1208</width>
-     <height>21</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -2057,20 +2057,13 @@
     <property name="title">
      <string>Advance Settings</string>
     </property>
-    <widget class="QMenu" name="menuSend_Alert">
-     <property name="title">
-      <string>Send Alert</string>
-     </property>
-     <addaction name="actionEmail"/>
-     <addaction name="actionLine"/>
-    </widget>
     <addaction name="actionMeasurement"/>
     <addaction name="actionAC_Voltage"/>
     <addaction name="actionAC_Current"/>
     <addaction name="actionDC_Current"/>
     <addaction name="actionCalibration"/>
     <addaction name="separator"/>
-    <addaction name="menuSend_Alert"/>
+    <addaction name="actionSend_Alert"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuOptions"/>
@@ -2114,6 +2107,11 @@
   <action name="actionLine">
    <property name="text">
     <string>By Line Messenger</string>
+   </property>
+  </action>
+  <action name="actionSend_Alert">
+   <property name="text">
+    <string>Send Alert</string>
    </property>
   </action>
  </widget>

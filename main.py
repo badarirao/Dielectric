@@ -38,14 +38,15 @@ from pyqtgraph import mkPen, intColor, ViewBox, PlotDataItem
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
 from pandas import DataFrame, Series, concat
-from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
                     unique_filename, TemperatureSweepWorkerF, checkInstrument
 from math import log10
 from time import sleep
-
+from functools import partial
 import warnings
 warnings.filterwarnings("ignore")
+from setAlert import AlertForm
 
 # creating VLine class
 class VLine(QtWidgets.QFrame):
@@ -55,6 +56,19 @@ class VLine(QtWidgets.QFrame):
   
         super(VLine, self).__init__()
         self.setFrameShape(self.VLine|self.Sunken)
+
+# worker class to connect instrument
+class Worker(QObject):
+    finished = pyqtSignal()
+    adapters = pyqtSignal(list)
+    
+    def __init__(self):
+        super(Worker,self).__init__()
+        
+    def connect_instrument(self,a1=None,a2=None,a3=None,a4=None,a5=None,test=True):
+        instruments = list(checkInstrument(a1,a2,a3,a4,a5,test))
+        self.adapters.emit(instruments)
+        self.finished.emit()
 
 class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     """The Impedance program module."""
@@ -106,6 +120,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.phaseButton.clicked.connect(self.phasePlot)
         self.lossButton.clicked.connect(self.lossPlot)
         self.filenameText.editingFinished.connect(self.setFileName)
+        self.actionSend_Alert.triggered.connect(self.AlertSettings)
         self.setFileName(1)
         self.measureModeSet()
         self.tempOption()
@@ -123,9 +138,43 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.updatePlotOption()
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
-        self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr='com3')
-        #self.impd, self.TCont = checkInstrument(E4990Addr="GPIB0::17::INSTR",TControlAddr="")
-        #self.impd, self.TCont = checkInstrument(E4990Addr="",TControlAddr="")
+        """ Display list of custom temperatures, which can be edited
+        self.Form = QtWidgets.QWidget()
+        self.temptable = Ui_Form()
+        self.temptable.setupUi(self.Form)
+        self.loadTempButton.clicked.connect(self.showTempTable)
+        # TODO: Make a default temperature table, and load it in the beginning.
+        """
+        self.connectInstrumentThread()
+        
+    
+    def connectInstrumentThread(self):
+        self.statusBar().showMessage("Connecting instruments, please wait...")
+        self.parameterBox.setEnabled(False)
+        self.fileBox.setEnabled(False)
+        self.measureControlBox.setEnabled(False)
+        self.plotBox.setEnabled(False)
+        self.statusBox.setEnabled(False)
+        self.thread = QThread()
+        self.worker = Worker()
+        self.worker.moveToThread(self.thread)
+        self.thread.started.connect(partial(self.worker.connect_instrument,
+                                            a1="GPIB0::17::INSTR",
+                                            a5='com3'))
+        #self.thread.started.connect(partial(self.worker.connect_instrument,
+        #                                    E4990Addr="GPIB0::17::INSTR")
+        #self.thread.started.connect(partial(self.worker.connect_instrument,
+        #                                    TControlAddr='com3'))
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.adapters.connect(self.getInstruments)
+        self.thread.finished.connect(self.afterConnect)
+        self.thread.start()
+        
+    def getInstruments(self,instruments):
+        self.impd = instruments[0]
+        self.TCont = instruments[4]
         self.modeLabel = QtWidgets.QLabel("")
         self.modeLabel.setText("Simulation mode running")
         simulation = False
@@ -145,17 +194,21 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         if self.TCont.ID == 'Chino':
             self.fixedTemp.setValue(20)
         self.statusBar().addPermanentWidget(self.statusLabel)
+    
+    def AlertSettings(self):
+        self.alert.exec_()
+    
+    def afterConnect(self):
+        self.statusBar().showMessage("Connected")
+        self.parameterBox.setEnabled(True)
+        self.fileBox.setEnabled(True)
+        self.measureControlBox.setEnabled(True)
+        self.plotBox.setEnabled(True)
+        self.statusBox.setEnabled(True)
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
         self.continuousDisplay()
-        """ Display list of custom temperatures, which can be edited
-        self.Form = QtWidgets.QWidget()
-        self.temptable = Ui_Form()
-        self.temptable.setupUi(self.Form)
-        self.loadTempButton.clicked.connect(self.showTempTable)
-        # TODO: Make a default temperature table, and load it in the beginning.
-        """
     
     def checkPaths(self):
         """
@@ -261,6 +314,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.plotView.setRowHidden(3,True)
         self.TsensorView = self.sensor.view()
         self.updateTemperatureController()
+        self.alert = AlertForm()
     
     def updateStartTemp(self):
         self.TCont.startT = self.startTemp.value()
