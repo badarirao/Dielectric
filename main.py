@@ -85,6 +85,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.leftPlot.vb.sigResized.connect(self.updateViews)
         #self.rightPlot.hide()
         self.checkPaths()
+        self.alert = AlertSetting(self.settingPath,self.currPath)
         self.fixFreq.clicked.connect(self.freqOption)
         self.fixTemp.clicked.connect(self.tempOption)
         self.fixDCvolts.clicked.connect(self.DCvoltOption)
@@ -201,7 +202,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def AlertSettings(self):
         self.alert.exec_()
-        print(self.alert.currentUser)
     
     def afterConnect(self):
         self.statusBar().showMessage("Connected")
@@ -319,7 +319,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.plotView.setRowHidden(3,True)
         self.TsensorView = self.sensor.view()
         self.updateTemperatureController()
-        self.alert = AlertSetting(self.settingPath,self.currPath)
     
     def updateStartTemp(self):
         self.TCont.startT = self.startTemp.value()
@@ -690,7 +689,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def startFreqSweepThread(self):
         self.freqthread = QThread()
-        self.fSweepWorker = FrequencySweepWorker(self.impd,self.TCont)
+        self.fSweepWorker = FrequencySweepWorker(self.impd,self.TCont,self.alert.currentUser)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
         self.fSweepWorker.finished.connect(self.finishAction)
@@ -849,7 +848,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
-        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.TCont)
+        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.TCont, self.alert.currentUser)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.finishAction)

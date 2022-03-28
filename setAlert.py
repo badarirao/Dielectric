@@ -87,15 +87,20 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         self.settingPath = settingPath
         self.currentPath = currentPath
         self.currentUser = 'None'
+        self.currentIndex = 0
         self.alertNames = QtWidgets.QMenu()
         self.userMenu.setMenu(self.alertNames)
         self.loadUserDetails()
+        self.currentIndex = len(self.userList)-1
         self.alertNames.triggered.connect(self.showUserDetails)
+        self.actions[self.currentIndex].trigger()
         self.addModifyButton.clicked.connect(self.updateUserinFile)
+        self.deleteUserButton.clicked.connect(self.deleteUserFromFile)
         #self.setWindowTitle("Specify Alert Settings")
     
     def loadUserDetails(self):
         self.alertNames.clear()
+        self.actions = []
         os.chdir(self.settingPath)
         with open('users.txt', 'r') as f:
             self.userList = f.readlines()
@@ -110,12 +115,15 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
                 user.extend(l)
             elif len(user) > 5:
                 user = user[:5]
-            self.alertNames.addAction(user[0])
+            self.actions.append(self.alertNames.addAction(user[0]))
             self.userList[i] = user
     
     def showUserDetails(self,x):
         userName = x.text()
         if userName == 'None':
+            self.userName.setText('')
+            self.email.setText('')
+            self.lineToken.setText('')
             self.frame.setEnabled(False)
             self.addModifyButton.setEnabled(False)
             self.deleteUserButton.setEnabled(False)
@@ -123,9 +131,9 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
             self.frame.setEnabled(True)
             self.addModifyButton.setEnabled(True)
             self.deleteUserButton.setEnabled(True)
-            userExists = False
-            for user in self.userList:
+            for i,user in enumerate(self.userList):
                 if user[0] == userName:
+                    self.currentIndex = i
                     if userName == 'New-User':
                         self.userName.setText('')
                     else:
@@ -166,23 +174,26 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
                     user[4] = '1'
             else:
                 print("Line Token incorrect")
+            if user[1] == '' and user[2] == '':
+                print("No email or line  token provided. User not stored.")
+                updated = False
         else:
             print("Invalid user name")
             updated = False
         newUser = True
-        userPosition = -1
         # Check user name position
         for i,u in enumerate(self.userList):
             if user[0] == u[0]:
                 newUser = False
-                userPosition = i
+                self.currentIndex = i
                 break
         if updated:
             if not newUser:
-                self.userList[userPosition] = user
+                self.userList[self.currentIndex] = user
                 print("Successfully updated")
             else:
                 self.userList.append(user)
+                self.currentIndex = len(self.userList)-1
                 print("Successfully added")
             with open('users.txt','w') as f:
                 for u in self.userList:
@@ -194,10 +205,24 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         else:
             print("Not updated")
             
+    def deleteUserFromFile(self):
+        self.alertNames.removeAction(self.actions[self.currentIndex])
+        self.actions.pop(self.currentIndex)
+        with open('users.txt','w') as f:
+            for u in self.userList:
+                if u[0] != 'New-User' and u[0]!= 'None':
+                    line = ' '.join(u)
+                    f.write(line)
+                    f.write('\n')
+        self.currentIndex = len(self.userList)-1
+        self.actions[self.currentIndex].trigger()
+        # delete from file
+        
     
     def closeEvent(self, event):
         os.chdir(self.currentPath)
-        event.accept()        
+        self.actions[self.currentIndex].trigger()
+        event.accept()
                 
 if __name__ == "__main__":
     import sys
