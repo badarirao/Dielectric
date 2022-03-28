@@ -46,7 +46,7 @@ from time import sleep
 from functools import partial
 import warnings
 warnings.filterwarnings("ignore")
-from setAlert import AlertForm
+from setAlert import AlertSetting
 
 # creating VLine class
 class VLine(QtWidgets.QFrame):
@@ -148,6 +148,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.connectInstrumentThread()
         
     
+    def updateNames(self):
+        for user in self.alert.userList:
+            self.alertNames.addAction(user[0])
+    
     def connectInstrumentThread(self):
         self.statusBar().showMessage("Connecting instruments, please wait...")
         self.parameterBox.setEnabled(False)
@@ -197,6 +201,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def AlertSettings(self):
         self.alert.exec_()
+        print(self.alert.currentUser)
     
     def afterConnect(self):
         self.statusBar().showMessage("Connected")
@@ -314,7 +319,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.plotView.setRowHidden(3,True)
         self.TsensorView = self.sensor.view()
         self.updateTemperatureController()
-        self.alert = AlertForm()
+        self.alert = AlertSetting(self.settingPath,self.currPath)
     
     def updateStartTemp(self):
         self.TCont.startT = self.startTemp.value()

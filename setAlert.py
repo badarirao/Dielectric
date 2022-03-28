@@ -7,13 +7,14 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+import os, re
 
 class AlertForm(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
         Form.resize(450, 198)
-        Form.setMinimumSize(QtCore.QSize(424, 124))
-        Form.setMaximumSize(QtCore.QSize(800, 800))
+        Form.setMinimumSize(QtCore.QSize(450, 198))
+        Form.setMaximumSize(QtCore.QSize(450, 198))
         Form.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
         Form.setAcceptDrops(False)
         self.gridLayout_3 = QtWidgets.QGridLayout(Form)
@@ -23,15 +24,6 @@ class AlertForm(object):
         self.addModifyButton = QtWidgets.QPushButton(Form)
         self.addModifyButton.setObjectName("addModifyButton")
         self.gridLayout_2.addWidget(self.addModifyButton, 2, 0, 1, 1)
-        self.userMenu = QtWidgets.QPushButton(Form)
-        self.userMenu.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        self.userMenu.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
-        self.userMenu.setAcceptDrops(True)
-        self.userMenu.setObjectName("userMenu")
-        self.gridLayout_2.addWidget(self.userMenu, 0, 1, 1, 1)
-        self.userLabel = QtWidgets.QLabel(Form)
-        self.userLabel.setObjectName("userLabel")
-        self.gridLayout_2.addWidget(self.userLabel, 0, 0, 1, 1)
         self.deleteUserButton = QtWidgets.QPushButton(Form)
         self.deleteUserButton.setObjectName("deleteUserButton")
         self.gridLayout_2.addWidget(self.deleteUserButton, 2, 1, 1, 1)
@@ -63,6 +55,12 @@ class AlertForm(object):
         self.userNameLabel.setObjectName("userNameLabel")
         self.gridLayout.addWidget(self.userNameLabel, 0, 0, 1, 1)
         self.gridLayout_2.addWidget(self.frame, 1, 0, 1, 2)
+        self.userMenu = QtWidgets.QPushButton(Form)
+        self.userMenu.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
+        self.userMenu.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
+        self.userMenu.setAcceptDrops(True)
+        self.userMenu.setObjectName("userMenu")
+        self.gridLayout_2.addWidget(self.userMenu, 0, 0, 1, 2)
         self.gridLayout_3.addLayout(self.gridLayout_2, 0, 0, 1, 1)
 
         self.retranslateUi(Form)
@@ -70,57 +68,137 @@ class AlertForm(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Specify Alert Settings"))
+        Form.setWindowTitle(_translate("Form", "Form"))
         self.addModifyButton.setToolTip(_translate("Form", "<html><head/><body><p>Click here to add new user or modify email and line token of a user. You cannot modify user name here.</p></body></html>"))
         self.addModifyButton.setText(_translate("Form", "Update User"))
-        self.userMenu.setToolTip(_translate("Form", "<html><head/><body><p>Select user from list</p></body></html>"))
-        self.userMenu.setText(_translate("Form", "PushButton"))
-        self.userLabel.setText(_translate("Form", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Select User</span></p></body></html>"))
         self.deleteUserButton.setText(_translate("Form", "Delete User"))
         self.emailCheckBox.setToolTip(_translate("Form", "<html><head/><body><p>Check this box to send alert to specified email</p></body></html>"))
         self.emailCheckBox.setText(_translate("Form", "Email"))
         self.lineCheckBox.setToolTip(_translate("Form", "<html><head/><body><p>Check this box to send alert to your line account</p></body></html>"))
         self.lineCheckBox.setText(_translate("Form", "Line Token"))
         self.userNameLabel.setText(_translate("Form", "<html><head/><body><p><span style=\" font-size:10pt; font-weight:600;\">User Name</span></p></body></html>"))
+        self.userMenu.setToolTip(_translate("Form", "<html><head/><body><p>Select user from list</p></body></html>"))
+        self.userMenu.setText(_translate("Form", "Select User"))
 
 class AlertSetting(QtWidgets.QDialog, AlertForm):
-    def __init__(self, *args, obj=None, **kwargs):
+    def __init__(self, settingPath = '',currentPath = '', *args, obj=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setupUi(self)
+        self.settingPath = settingPath
+        self.currentPath = currentPath
+        self.currentUser = 'None'
+        self.alertNames = QtWidgets.QMenu()
+        self.userMenu.setMenu(self.alertNames)
+        self.loadUserDetails()
+        self.alertNames.triggered.connect(self.showUserDetails)
+        self.addModifyButton.clicked.connect(self.updateUserinFile)
+        #self.setWindowTitle("Specify Alert Settings")
+    
+    def loadUserDetails(self):
+        self.alertNames.clear()
+        os.chdir(self.settingPath)
         with open('users.txt', 'r') as f:
-            self.usersList = f.readlines().split('\n')
-        self.filename = "SHG_default_Settings.txt"
-        self.load_parameters_from_file()
-        self.changed = False
-        self.grp = [item('X-axis Scale     :', self.xscale, suffix='V = 1 μm', limits=(0.00000001, 100000000), siPrefix=True),
-                    item('X-axis V max   :', self.xvmax,
-                         suffix='V', limits=(-10, 10)),
-                    item('X-axis V min    :', self.xvmin,
-                         suffix='V', limits=(-10, 10)),
-                    item('Set x-axis position:', self.xpos,
-                         suffix='V', siPrefix=True),
-                    item('X-axis max       :', self.xmax,
-                         suffix='μm', readonly=True),
-                    item('X-axis min       :', self.xmin,
-                         suffix='μm', readonly=True),
-                    item('Y-axis Scale     :', self.yscale, suffix='V = 1 μm',
-                         limits=(0.00000001, 100000000), siPrefix=True),
-                    item('Y-axis V max   :', self.yvmax,
-                         suffix='V', limits=(-10, 10)),
-                    item('Y-axis V min    :', self.yvmin,
-                         suffix='V', limits=(-10, 10)),
-                    item('Set y-axis position:', self.ypos,
-                         suffix='V', siPrefix=True),
-                    item('Y-axis max       :', self.ymax,
-                         suffix='μm', readonly=True),
-                    item('Y-axis min        :', self.ymin, suffix='μm', readonly=True)]
-        self.galset_setupUi(self, self.grp)
-        self.setWindowTitle("Galvanometer Settings")
-        self.cancelButton.clicked.connect(self.cancel_galsetting)
-        self.okayButton.clicked.connect(self.okay_galsetting)
-        self.defaultButton.clicked.connect(self.goDefault)
-        self.setdefaultButton.clicked.connect(self.setAsDefault)
-        self.treeWidget.paramSet.sigTreeStateChanged.connect(self.galsetchange)
+            self.userList = f.readlines()
+        self.userList.append('None  ')
+        self.userList.insert(0,'New-User  ')
+        for i,user in enumerate(self.userList):
+            user = user.rstrip()
+            user = user.split(' ')
+            if len(user) < 5:
+                toAdd = 5 - len(user)
+                l = ['']*toAdd
+                user.extend(l)
+            elif len(user) > 5:
+                user = user[:5]
+            self.alertNames.addAction(user[0])
+            self.userList[i] = user
+    
+    def showUserDetails(self,x):
+        userName = x.text()
+        if userName == 'None':
+            self.frame.setEnabled(False)
+            self.addModifyButton.setEnabled(False)
+            self.deleteUserButton.setEnabled(False)
+        else:
+            self.frame.setEnabled(True)
+            self.addModifyButton.setEnabled(True)
+            self.deleteUserButton.setEnabled(True)
+            userExists = False
+            for user in self.userList:
+                if user[0] == userName:
+                    if userName == 'New-User':
+                        self.userName.setText('')
+                    else:
+                        self.userName.setText(user[0])
+                    self.email.setText(user[1])
+                    self.lineToken.setText(user[2])
+                    if user[3] == '1':
+                        self.emailCheckBox.setChecked(True)
+                    else:
+                        self.emailCheckBox.setChecked(False)
+                    if user[4] == '1':
+                        self.lineCheckBox.setChecked(True)
+                    else:
+                        self.lineCheckBox.setChecked(False)
+        self.currentUser = [userName,
+                            self.email.text(),
+                            self.lineToken.text(),
+                            self.emailCheckBox.isChecked(),
+                            self.lineCheckBox.isChecked()]
         
+    def updateUserinFile(self):
+        updated = True
+        user = ['','','','0','0']
+        namePattern = '^[A-Za-z0-9_-]'
+        emailPattern = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
+        lineTokenPattern = '^[A-Za-z0-9]'
+        if bool(re.match(namePattern,self.userName.text())):
+            user[0] = self.userName.text()
+            if re.fullmatch(emailPattern,self.email.text()):
+                user[1] = self.email.text()
+                if self.emailCheckBox.isChecked():
+                    user[3] = '1'
+            else:
+                print("Email incorrect")
+            if bool(re.match(lineTokenPattern,self.lineToken.text())):
+                user[2] = self.lineToken.text()
+                if self.lineCheckBox.isChecked():
+                    user[4] = '1'
+            else:
+                print("Line Token incorrect")
+        else:
+            print("Invalid user name")
+            updated = False
+        newUser = True
+        userPosition = -1
+        # Check user name position
+        for i,u in enumerate(self.userList):
+            if user[0] == u[0]:
+                newUser = False
+                userPosition = i
+                break
+        if updated:
+            if not newUser:
+                self.userList[userPosition] = user
+                print("Successfully updated")
+            else:
+                self.userList.append(user)
+                print("Successfully added")
+            with open('users.txt','w') as f:
+                for u in self.userList:
+                    if u[0] != 'New-User' and u[0]!= 'None':
+                        line = ' '.join(u)
+                        f.write(line)
+                        f.write('\n')
+            self.loadUserDetails()
+        else:
+            print("Not updated")
+            
+    
+    def closeEvent(self, event):
+        os.chdir(self.currentPath)
+        event.accept()        
+                
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
