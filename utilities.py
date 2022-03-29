@@ -19,6 +19,7 @@ from E4990A import KeysightE44990A
 from random import randint, uniform
 from math import ceil
 from chino import ChinoKP1000C
+import requests
 #from keithley195 import Keithley195
 #from advantestTR6845 import AdvantestTR6845
 
@@ -268,6 +269,11 @@ def connectDevice(inst, addr, test=False):
 
 
 def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=None, TControlAddr = None, test=False):
+    impd = None
+    mux = None
+    k195 = None
+    Adv = None
+    Tcont = None
     if E4990Addr:
         try:
             impd = KeysightE44990A(E4990Addr)
@@ -282,7 +288,7 @@ def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=No
             Tcont = FakeTempController()
     else:
         Tcont = FakeTempController()
-    return impd, Tcont
+    return impd, mux, k195, Adv, Tcont
     """
     Obtain instrument address of K2450, K2700 and function generator.
 
@@ -418,10 +424,11 @@ class FrequencySweepWorker(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont=None):
+    def __init__(self, impd=None, TCont=None, user = None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
+        self.user = user
         self.start = self.impd.startf
         self.end = self.impd.endf
         self.npoints = self.impd.npointsf
@@ -498,10 +505,11 @@ class TemperatureSweepWorkerF(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont = None):
+    def __init__(self, impd=None, TCont = None, user = None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
+        self.user = user
         if self.impd == None:
             self.impd = FakeImpd()
         if self.TCont == None:
@@ -588,6 +596,7 @@ class TemperatureSweepWorkerF(QObject):
                 TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
+        sendMessage(self.user,"Started temperature sweep from {}K".format(self.TCont.temp))
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
@@ -631,7 +640,8 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-            self.finished.emit()
+        sendMessage(self.user,"Stopped temperature sweep at {}K".format(self.TCont.temp))
+        self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):
     # spacing = 0, 1, 2 = linear, log10, linear-Log10
@@ -727,3 +737,20 @@ def get_valid_filename(s):
     """
     s = str(s).strip().replace(' ', '_')
     return sub(r'(?u)[^-\w.]', '', s)
+
+def sendMessage(user,message):
+    if len(user) == 5:
+        if user[4]:
+            sendLineMessage(user[2],message)
+        if user[3]:
+            sendEmailMessage(user[1],message)
+
+def sendLineMessage(token,message):
+    payload = {'message' : message}
+    r = requests.post('https://notify-api.line.me/api/notify',
+                      headers={'Authorization' : 'Bearer {}'.format(token)},
+                      params = payload)
+    print("Sent line message", r.text)
+
+def sendEmailMessage(email,message):
+    pass
