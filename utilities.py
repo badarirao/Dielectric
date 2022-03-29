@@ -739,6 +739,7 @@ def get_valid_filename(s):
     return sub(r'(?u)[^-\w.]', '', s)
 
 def sendMessage(user,message):
+    print(user)
     if len(user) == 5:
         if user[4]:
             sendLineMessage(user[2],message)
