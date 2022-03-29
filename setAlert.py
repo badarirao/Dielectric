@@ -94,6 +94,7 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         self.userMenu.setMenu(self.alertNames)
         self.userMenu.setLayoutDirection(QtCore.Qt.RightToLeft)
         os.chdir(self.settingPath)
+        self.api = "api:"
         self.loadUserDetails()
         self.currentIndex = len(self.userList)-1
         self.alertNames.triggered.connect(self.showUserDetails)
@@ -107,6 +108,8 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         self.actions = []
         with open('users.txt', 'r') as f:
             self.userList = f.readlines()
+            self.api = self.userList[0].rstrip()
+            self.userList = self.userList[1:]
         self.userList.append('None  ')
         self.userList.insert(0,'New-User  ')
         for i,user in enumerate(self.userList):
@@ -200,11 +203,12 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
                 self.currentIndex = len(self.userList)-1
                 print("Successfully added")
             with open('users.txt','w') as f:
+                f.write(self.api)
                 for u in self.userList:
                     if u[0] != 'New-User' and u[0]!= 'None':
                         line = ' '.join(u)
-                        f.write(line)
                         f.write('\n')
+                        f.write(line)
                 f.flush()
             self.loadUserDetails()
         else:
@@ -216,11 +220,12 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
             self.actions.pop(self.currentIndex)
             self.userList.pop(self.currentIndex)
             with open('users.txt','w') as f:
+                f.write(self.api)
                 for u in self.userList:
                     if u[0] != 'New-User' and u[0]!= 'None':
                         line = ' '.join(u)
-                        f.write(line)
                         f.write('\n')
+                        f.write(line)
             self.currentIndex = len(self.userList)-1
             self.actions[self.currentIndex].trigger()
         else:

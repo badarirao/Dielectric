@@ -8,6 +8,10 @@ from datetime import datetime
 from os.path import abspath, join, exists
 from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
+import os
+import mailslurp_client
+from smtplib import SMTP
+from mailslurp_client import CreateInboxDto
 from copy import copy
 from re import sub
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -424,7 +428,7 @@ class FrequencySweepWorker(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont=None, user = None):
+    def __init__(self, impd=None, TCont=None, user = None, inbox = None, smtp_access = None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
@@ -433,6 +437,8 @@ class FrequencySweepWorker(QObject):
         self.end = self.impd.endf
         self.npoints = self.impd.npointsf
         self.spacing = self.impd.sweeptypef
+        self.inbox = inbox
+        self.smtp_access = smtp_access
         if self.impd == None:
             self.impd = FakeImpd()
         self.stopCall = False
@@ -505,11 +511,13 @@ class TemperatureSweepWorkerF(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont = None, user = None):
+    def __init__(self, impd=None, TCont = None, user = None, inbox = None, smtp_access = None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
         self.user = user
+        self.inbox = inbox
+        self.smtp_access = smtp_access
         if self.impd == None:
             self.impd = FakeImpd()
         if self.TCont == None:
@@ -596,7 +604,10 @@ class TemperatureSweepWorkerF(QObject):
                 TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
-        sendMessage(self.user,"Started temperature sweep from {}K".format(self.TCont.temp))
+        sendMessage(self.inbox,
+                    self.smtp_access,
+                    self.user,
+                    "Started temperature sweep from {}K".format(self.TCont.temp))
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
@@ -640,7 +651,10 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        sendMessage(self.user,"Stopped temperature sweep at {}K".format(self.TCont.temp))
+        sendMessage(self.inbox,
+                    self.smtp_access,
+                    self.user,
+                    "Stopped temperature sweep at {}K".format(self.TCont.temp))
         self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):
@@ -738,13 +752,13 @@ def get_valid_filename(s):
     s = str(s).strip().replace(' ', '_')
     return sub(r'(?u)[^-\w.]', '', s)
 
-def sendMessage(user,message):
+def sendMessage(inbox,smtp_access,user,message):
     print(user)
     if len(user) == 5:
         if user[4]:
             sendLineMessage(user[2],message)
         if user[3]:
-            sendEmailMessage(user[1],message)
+            sendEmailMessage(inbox,smtp_access,user[1],message)
 
 def sendLineMessage(token,message):
     payload = {'message' : message}
@@ -753,5 +767,42 @@ def sendLineMessage(token,message):
                       params = payload)
     print("Sent line message", r.text)
 
-def sendEmailMessage(email,message):
-    pass
+def sendEmailMessage(inbox,smtp_access,email,message):
+    message = "Subject: Message from YokotaLab \r\n\r\n" + message
+    if inbox and smtp_access:
+        with SMTP(host=smtp_access.smtp_server_host, port=smtp_access.smtp_server_port) as smtp:
+            smtp.login(user=smtp_access.smtp_username, password=smtp_access.smtp_password)
+            smtp.sendmail(from_addr=inbox.email_address, to_addrs=[email], msg=message)
+            smtp.quit()
+    else:
+        print("Email not configured correctly")
+
+
+def initializeEmail(settingPath):
+    # the api key of your mailslurp account is stored in settingfile.dnd as 'api:######'
+    os.chdir(settingPath)
+    apiKey = ''
+    with open("users.txt",'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.split(':')
+            if len(line) == 2:
+                if line[0] == 'api':
+                    apiKey = line[1].rstrip()
+    if apiKey:
+        configuration = mailslurp_client.Configuration()
+        configuration.api_key['x-api-key'] = apiKey
+        with mailslurp_client.ApiClient(configuration) as api_client:
+            inbox_controller = mailslurp_client.InboxControllerApi(api_client)
+            inboxes = inbox_controller.get_all_inboxes(page=0)
+            inbox = None
+            for box in inboxes.content:
+                if "@mailslurp.mx" in box.email_address:
+                    inbox = box
+                    break
+            if not inbox:
+                inbox = inbox_controller.create_inbox_with_options(CreateInboxDto(inbox_type="SMTP_INBOX",
+                                                                                  name="YokotaLab",
+                                                                                  description="Experiment status from Yokota Lab"))
+            smtp_access = inbox_controller.get_imap_smtp_access(inbox_id=inbox.id)
+            return inbox,smtp_access
