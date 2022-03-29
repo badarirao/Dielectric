@@ -81,28 +81,28 @@ class Keithley195a(Instrument):
         self.write('G1DX')  # Disable returning prefix and suffix
     
 
-k195 = Keithley195a("GPIB0::2::INSTR")
+#k195 = Keithley195a("GPIB0::2::INSTR")
 ch = Chino('com3')
-ch.write_param(' 3, 1, 01,00,31,0,')   # step 0, start at 20K
-ch.write_param(' 3, 2, 01,01,280,0.50,') # go to 280 K at 5k/min rate (in 52 mins)
-ch.write_param(' 3, 2, 01,02,280,0.10,') # stay at 280K for 10 mins
+#ch.write_param(' 3, 1, 01,00,31,0,')   # step 0, start at 20K
+#ch.write_param(' 3, 2, 01,01,280,0.50,') # go to 280 K at 5k/min rate (in 52 mins)
+#ch.write_param(' 3, 2, 01,02,280,0.10,') # stay at 280K for 10 mins
 #ch.write_param(' 3, 2, 01,03,40,0.48,')  # go to 20K at 5k/min
 #ch.write_param(' 3, 2, 01,04,280,2.00') # go to 280 K at 2K/min rate (in 130 mins)
 #ch.write_param(' 3, 2, 01,05,280,0.10') # stay at 280K for 10 mins
-ch.write_param(' 3, 3, 01,03,00,0,') # end program, and set output to zero
-ch.write_param(' 2, 1, 1, 01,') # run pattern 1
+#ch.write_param(' 3, 3, 01,03,00,0,') # end program, and set output to zero
+#ch.write_param(' 2, 1, 1, 01,') # run pattern 1
 count = 1
 zerotime = time.time()
-file = "monitor_data"
+file = "heat_after_tuninga1dpersec"
 file2 = unique_filename(directory='./',prefix=file,datetimeformat="")
-#text_file = open("Raw_Output.txt", "w")
+text_file = open("Raw_Output.txt", "w")
 while True:
     try:
-        v = float(k195.read())*1000.0  # convert v to millivolts
-        k_temp = vtoK(v*1000) # send v in microvolts
+        #v = float(k195.read())*1000.0  # convert v to millivolts
+        #k_temp = vtoK(v*1000) # send v in microvolts
         ch.real_data_request()
-        #text_file.write(ch.data+'\n')
-        #text_file.flush()  # force data to be written to hard-disk instead of being kept in buffer
+        text_file.write(ch.data+'\n')
+        text_file.flush()  # force data to be written to hard-disk instead of being kept in buffer
         y_temp = float(ch.PV)
         y_set_temp = float(ch.SV)
         y_output = float(ch.MV1)
@@ -110,19 +110,19 @@ while True:
         data = pd.DataFrame({
                 'Time Stamp (s)': [time.time()],
                 'Time Elapsed (s)': [x_time],
-                'Keithley195 Voltage (mV)': [v],
-                'Keithley195 Temperature (K)': [k_temp],
+                #'Keithley195 Voltage (mV)': [v],
+                #'Keithley195 Temperature (K)': [k_temp],
                 'Chino Temperature (K)': [y_temp],
                 'Set Temperature (K)': [y_set_temp],
                 'Output power (W)' : [y_output]
                 })
         time.sleep(2)
         if count == 1:
-            data.to_csv(file2,mode='a')
+            data.to_csv(file2,mode='a',index=False)
         else:
-            data.to_csv(file2,mode='a',header=False)
+            data.to_csv(file2,mode='a',header=False,index=False)
         if count%200==0 or count == 1:
-            print("Temperature after {0} seconds is {1} K(Chino), {2} K(K195), output_power {3}".format(x_time,y_temp,k_temp,y_output))
+            print("Temperature after {0} seconds is {1} K(Chino), output_power {2}".format(x_time,y_temp,y_output))
         if ch.status == 3:
             ch.reset_program()
             break
@@ -134,5 +134,6 @@ while True:
         #text_file.close()
         sys.exit(0)
 ch.s.close()
+text_file.close()
 #text_file.close()
 print("Program finished! Data saved")
