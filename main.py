@@ -40,7 +40,7 @@ from templist import Ui_Form
 from pandas import DataFrame, Series, concat
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
-                    unique_filename, TemperatureSweepWorkerF, checkInstrument
+                    unique_filename, TemperatureSweepWorkerF, checkInstrument, initializeEmail
 from math import log10
 from time import sleep
 from functools import partial
@@ -689,7 +689,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def startFreqSweepThread(self):
         self.freqthread = QThread()
-        self.fSweepWorker = FrequencySweepWorker(self.impd,self.TCont,self.alert.currentUser)
+        self.fSweepWorker = FrequencySweepWorker(self.impd,
+                                                 self.TCont,
+                                                 self.alert.currentUser,
+                                                 self.settingpath)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
         self.fSweepWorker.finished.connect(self.finishAction)
@@ -848,7 +851,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
-        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, self.TCont, self.alert.currentUser)
+        self.tSweepWorker = TemperatureSweepWorkerF(self.impd, 
+                                                    self.TCont,
+                                                    self.alert.currentUser,
+                                                    self.settingPath)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.finishAction)

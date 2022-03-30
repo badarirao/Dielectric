@@ -7,6 +7,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QSize
 import os, re
 
 class AlertForm(object):
@@ -89,7 +90,11 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         self.currentUser = 'None'
         self.currentIndex = 0
         self.alertNames = QtWidgets.QMenu()
+        self.alertNames.setMinimumSize(QSize(250,20))
         self.userMenu.setMenu(self.alertNames)
+        self.userMenu.setLayoutDirection(QtCore.Qt.RightToLeft)
+        os.chdir(self.settingPath)
+        self.api = "api:"
         self.loadUserDetails()
         self.currentIndex = len(self.userList)-1
         self.alertNames.triggered.connect(self.showUserDetails)
@@ -101,9 +106,10 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
     def loadUserDetails(self):
         self.alertNames.clear()
         self.actions = []
-        os.chdir(self.settingPath)
         with open('users.txt', 'r') as f:
             self.userList = f.readlines()
+            self.api = self.userList[0].rstrip()
+            self.userList = self.userList[1:]
         self.userList.append('None  ')
         self.userList.insert(0,'New-User  ')
         for i,user in enumerate(self.userList):
@@ -155,6 +161,7 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
                             self.lineCheckBox.isChecked()]
         
     def updateUserinFile(self):
+        os.chdir(self.settingPath)
         updated = True
         user = ['','','','0','0']
         namePattern = '^[A-Za-z0-9_-]'
@@ -196,28 +203,33 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
                 self.currentIndex = len(self.userList)-1
                 print("Successfully added")
             with open('users.txt','w') as f:
+                f.write(self.api)
                 for u in self.userList:
                     if u[0] != 'New-User' and u[0]!= 'None':
                         line = ' '.join(u)
-                        f.write(line)
                         f.write('\n')
+                        f.write(line)
+                f.flush()
             self.loadUserDetails()
         else:
             print("Not updated")
             
     def deleteUserFromFile(self):
-        self.alertNames.removeAction(self.actions[self.currentIndex])
-        self.actions.pop(self.currentIndex)
-        with open('users.txt','w') as f:
-            for u in self.userList:
-                if u[0] != 'New-User' and u[0]!= 'None':
-                    line = ' '.join(u)
-                    f.write(line)
-                    f.write('\n')
-        self.currentIndex = len(self.userList)-1
-        self.actions[self.currentIndex].trigger()
-        # delete from file
-        
+        if self.userList[self.currentIndex][0] != 'New-User':
+            self.alertNames.removeAction(self.actions[self.currentIndex])
+            self.actions.pop(self.currentIndex)
+            self.userList.pop(self.currentIndex)
+            with open('users.txt','w') as f:
+                f.write(self.api)
+                for u in self.userList:
+                    if u[0] != 'New-User' and u[0]!= 'None':
+                        line = ' '.join(u)
+                        f.write('\n')
+                        f.write(line)
+            self.currentIndex = len(self.userList)-1
+            self.actions[self.currentIndex].trigger()
+        else:
+            self.actions[-1].trigger()
     
     def closeEvent(self, event):
         os.chdir(self.currentPath)

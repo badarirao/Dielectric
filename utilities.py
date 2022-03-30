@@ -8,6 +8,8 @@ from datetime import datetime
 from os.path import abspath, join, exists
 from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
+import os
+from smtplib import SMTP
 from copy import copy
 from re import sub
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -424,7 +426,7 @@ class FrequencySweepWorker(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont=None, user = None):
+    def __init__(self, impd=None, TCont=None, user = None, settingPath = None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
@@ -433,6 +435,8 @@ class FrequencySweepWorker(QObject):
         self.end = self.impd.endf
         self.npoints = self.impd.npointsf
         self.spacing = self.impd.sweeptypef
+        self.settingPath = settingPath
+        self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
         if self.impd == None:
             self.impd = FakeImpd()
         self.stopCall = False
@@ -505,11 +509,13 @@ class TemperatureSweepWorkerF(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont = None, user = None):
+    def __init__(self, impd=None, TCont = None, user = None, settingPath=None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
         self.user = user
+        self.settingPath = settingPath
+        self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
         if self.impd == None:
             self.impd = FakeImpd()
         if self.TCont == None:
@@ -596,7 +602,12 @@ class TemperatureSweepWorkerF(QObject):
                 TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
-        sendMessage(self.user,"Started temperature sweep from {}K".format(self.TCont.temp))
+        message = "Subject: "+ self.subject + "\r\n\r\n" + "Started temperature sweep from {}K".format(self.TCont.temp)
+        sendMessage(self.senderemail,
+                    self.password,
+                    self.server,
+                    self.user,
+                    message)
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
@@ -640,7 +651,12 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        sendMessage(self.user,"Stopped temperature sweep at {}K".format(self.TCont.temp))
+        message = "Subject: "+ self.subject + "\r\n\r\n" + "Stopped temperature sweep at {}K".format(self.TCont.temp)
+        sendMessage(self.senderemail,
+                    self.password,
+                    self.server,
+                    self.user,
+                    message)
         self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):
@@ -738,12 +754,12 @@ def get_valid_filename(s):
     s = str(s).strip().replace(' ', '_')
     return sub(r'(?u)[^-\w.]', '', s)
 
-def sendMessage(user,message):
+def sendMessage(senderemail,password,server,user,message):
     if len(user) == 5:
         if user[4]:
             sendLineMessage(user[2],message)
         if user[3]:
-            sendEmailMessage(user[1],message)
+            sendEmailMessage(senderemail,password,server,user[1],message)
 
 def sendLineMessage(token,message):
     payload = {'message' : message}
@@ -752,5 +768,21 @@ def sendLineMessage(token,message):
                       params = payload)
     print("Sent line message", r.text)
 
-def sendEmailMessage(email,message):
-    pass
+def sendEmailMessage(senderemail,password,server,receiveremail,message):
+    with SMTP(server,587) as smtp:
+        smtp.ehlo()
+        smtp.starttls()
+        smtp.login(senderemail,password)
+        smtp.sendmail(senderemail, receiveremail, message)
+        smtp.quit()
+
+def initializeEmail(settingPath):
+    # the api key of your mailslurp account is stored in settingfile.dnd as 'api:######'
+    os.chdir(settingPath)
+    with open("users.txt",'r') as f:
+        line = f.readline().split()
+        email = line[0]
+        password = line[1]
+        server = line[2]
+        subject = " ".join(line[3:])
+    return email,password,server,subject
