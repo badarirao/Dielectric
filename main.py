@@ -30,6 +30,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Facility to alert by email if any alarm is triggered.
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
+# TODO: add help section on how to setup system email, and also how to get line token
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui

@@ -10,6 +10,7 @@ from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
 import os
 from smtplib import SMTP
+from email.message import EmailMessage
 from copy import copy
 from re import sub
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -602,11 +603,12 @@ class TemperatureSweepWorkerF(QObject):
                 TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
-        message = "Subject: "+ self.subject + "\r\n\r\n" + "Started temperature sweep from {}K".format(self.TCont.temp)
+        message = "Started temperature sweep from {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
                     self.server,
                     self.user,
+                    self.subject,
                     message)
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
@@ -651,11 +653,12 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        message = "Subject: "+ self.subject + "\r\n\r\n" + "Stopped temperature sweep at {}K".format(self.TCont.temp)
+        message = "Stopped temperature sweep at {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
                     self.server,
                     self.user,
+                    self.subject,
                     message)
         self.finished.emit()
         
@@ -754,12 +757,12 @@ def get_valid_filename(s):
     s = str(s).strip().replace(' ', '_')
     return sub(r'(?u)[^-\w.]', '', s)
 
-def sendMessage(senderemail,password,server,user,message):
+def sendMessage(senderemail,password,server,user,subject,message):
     if len(user) == 5:
         if user[4]:
-            sendLineMessage(user[2],message)
+            sendLineMessage(user[2],"{0}\n{1}".format(subject,message))
         if user[3]:
-            sendEmailMessage(senderemail,password,server,user[1],message)
+            sendEmailMessage(senderemail,password,server,user[1],subject,message)
 
 def sendLineMessage(token,message):
     payload = {'message' : message}
@@ -768,16 +771,25 @@ def sendLineMessage(token,message):
                       params = payload)
     print("Sent line message", r.text)
 
-def sendEmailMessage(senderemail,password,server,receiveremail,message):
-    with SMTP(server,587) as smtp:
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.login(senderemail,password)
-        smtp.sendmail(senderemail, receiveremail, message)
-        smtp.quit()
+def sendEmailMessage(senderemail,password,server,receiveremail,subject, message):
+    msg = EmailMessage()
+    msg.set_content(message)
+    msg['Subject'] = subject
+    msg['From'] = senderemail
+    msg['To'] = receiveremail
+    smtp =  SMTP(server,587)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(senderemail,password)
+    smtp.send_message(msg)
+    smtp.quit()
 
 def initializeEmail(settingPath):
-    # the api key of your mailslurp account is stored in settingfile.dnd as 'api:######'
+    # Sending email has only been tested with outlook.com, but should work with other emails as well.
+    # port 587 is generatlly used, if your email server has different port, change it in sendEmailMessage function
+    # the first line of users.txt should be following:
+    # system email, password, SMTP server, subject
+    # example: "abc.outlook.com password smtp-mail.outlook.com Message from Python"
     os.chdir(settingPath)
     with open("users.txt",'r') as f:
         line = f.readline().split()
