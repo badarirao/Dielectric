@@ -86,7 +86,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #self.rightPlot.hide()
         self.checkPaths()
         self.alert = AlertSetting(self.settingPath,self.currPath)
-        self.inbox, self.smtp_access = initializeEmail(self.settingPath)
         self.fixFreq.clicked.connect(self.freqOption)
         self.fixTemp.clicked.connect(self.tempOption)
         self.fixDCvolts.clicked.connect(self.DCvoltOption)
@@ -693,8 +692,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fSweepWorker = FrequencySweepWorker(self.impd,
                                                  self.TCont,
                                                  self.alert.currentUser,
-                                                 self.inbox,
-                                                 self.smtp_access)
+                                                 self.settingpath)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
         self.fSweepWorker.finished.connect(self.finishAction)
@@ -856,8 +854,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.tSweepWorker = TemperatureSweepWorkerF(self.impd, 
                                                     self.TCont,
                                                     self.alert.currentUser,
-                                                    self.inbox,
-                                                    self.smtp_access)
+                                                    self.settingPath)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.finishAction)
