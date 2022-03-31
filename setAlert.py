@@ -101,6 +101,7 @@ class AlertSetting(QtWidgets.QDialog, AlertForm):
         self.actions[self.currentIndex].trigger()
         self.addModifyButton.clicked.connect(self.updateUserinFile)
         self.deleteUserButton.clicked.connect(self.deleteUserFromFile)
+        os.chdir(self.currentPath)
         #self.setWindowTitle("Specify Alert Settings")
     
     def loadUserDetails(self):

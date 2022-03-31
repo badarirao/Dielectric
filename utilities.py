@@ -10,6 +10,7 @@ from pyvisa import ResourceManager, VisaIOError
 from os import makedirs
 import os
 from smtplib import SMTP
+from email.message import EmailMessage
 from copy import copy
 from re import sub
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -133,6 +134,11 @@ class FakeImpd(FakeAdapter):
         self.endf = 1e7
         self.npointsf = 50
         self.sweeptypef = 1
+        self.dcStart = -1
+        self.dcStop = 1
+        self.dcPoints = 21
+        self.dcTraceback = 0 
+        self.dcNcycles = 1
         self.stopCall = False
 
     def getFreqUnit(self):
@@ -202,11 +208,33 @@ class FakeImpd(FakeAdapter):
             self.cArray.append(c)
             self.dArray.append(d)
     
+    def start_dcSweep(self,i=0):
+        if i%2 == 0:
+            self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
+        else:
+            self.scannedDCvs = linspace(self.dcStop,self.dcStart,self.dcPoints)
+        self.zArray = []
+        self.pArray = []
+        self.cArray = []
+        self.dArray = []
+        for i in range(len(self.scannedDCvs)):
+            z = randint(1000, 10000)
+            p = randint(1, 100)
+            c = uniform(1e-7, 1e-12)
+            d = uniform(0, 1)
+            self.zArray.append(z)
+            self.pArray.append(p)
+            self.cArray.append(c)
+            self.dArray.append(d)
+    
     def read_measurement_data(self):
         return [self.zArray,self.pArray,self.cArray,self.dArray]
     
     def get_frequencies(self):
         return self.scannedFrequencies
+    
+    def get_DCvolts(self):
+        return list(self.scannedDCvs)
 
 def get_linlog_segment_list(start, end, npoints):
     if start < 20:
@@ -432,7 +460,7 @@ class FrequencySweepWorker(QObject):
         self.TCont = TCont
         self.user = user
         self.start = self.impd.startf
-        self.end = self.impd.endf
+        self.stop = self.impd.endf
         self.npoints = self.impd.npointsf
         self.spacing = self.impd.sweeptypef
         self.settingPath = settingPath
@@ -456,7 +484,7 @@ class FrequencySweepWorker(QObject):
             self.impd.write(":SENS1:SWE:TYPE LOG") 
         elif self.spacing == 2:
             self.impd.write(":SENS1:SWE:POIN 1500")
-            segments = get_linlog_segment_list(self.start, self.end, self.npoints)
+            segments = get_linlog_segment_list(self.start, self.stop, self.npoints)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
             if self.impd.Vdc:
@@ -476,7 +504,7 @@ class FrequencySweepWorker(QObject):
         if self.spacing != 2:
             self.impd.write(":SENS1:SWE:POIN {}".format(self.npoints+1)) # set number of points
             self.impd.write(":SENS1:FREQ:STAR {}".format(self.start)) # set start frequency
-            self.impd.write(":SENS1:FREQ:STOP {}".format(self.end)) # set stop frequency
+            self.impd.write(":SENS1:FREQ:STOP {}".format(self.stop)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
             if self.impd.Vdc:
@@ -501,6 +529,77 @@ class FrequencySweepWorker(QObject):
         self.data.emit(wholedata)
         self.finished.emit()
         
+class DCSweepWorker(QObject):
+    finished = pyqtSignal()
+    data = pyqtSignal(list)
+    stopcall = pyqtSignal()
+    showStatus = pyqtSignal(str)
+
+    def __init__(self, impd=None, TCont=None, user = None, settingPath = None):
+        super().__init__()
+        self.impd = impd
+        self.TCont = TCont
+        self.user = user
+        self.start = self.impd.dcStart
+        self.stop = self.impd.dcStop
+        self.npoints = self.impd.dcPoints
+        self.traceback = self.impd.dcTraceback
+        self.ncycles = self.impd.dcNcycles
+        self.settingPath = settingPath
+        self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
+        if self.impd == None:
+            self.impd = FakeImpd()
+        self.stopCall = False
+        self.stopcall.connect(self.stopcalled)
+        self.impd.setMeasurementSpeed(2)
+
+    def stopcalled(self):
+        self.stopCall = True
+
+    def start_dc_sweep(self):
+        sleep(0.1)
+        self.impd.trig_from_PC()
+        self.impd.continuous_measurement()
+        # set DC bias range to 1mA
+        # toggle DC bias constant to off
+        # set max and min dc bias voltage range
+        # you can set delay after DC bias is applied
+        self.impd.write(":SENS1:SWE:POIN {}".format(self.npoints+1)) # set number of points
+        self.impd.write(":SOURce1:BIAS:VOLTage:STARt {}".format(self.start)) # set start DC voltage
+        self.impd.write(":SOURce1:BIAS:VOLTage:STOP {}".format(self.stop)) # set stop DC voltage
+        self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
+        self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+        self.impd.write(":SENS1:SWE:TYPE BIAS")
+        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        self.impd.display_on()
+        self.impd.enable_display_update()
+        self.impd.setYAutoScale()
+        self.showStatus.emit("Started DC bias sweep, please wait..")
+        sweepInitialTemperature = self.TCont.temp
+        i = 0
+        measuredData = [[],[],[],[]]
+        dcBiasData = []
+        while True:
+            self.impd.start_dcSweep(i)
+            self.impd.wait_to_complete()
+            newdata = self.impd.read_measurement_data()
+            for i in range(len(measuredData)):
+                measuredData[i].extend(newdata[i])
+            dcBiasData.extend(self.impd.get_DCvolts())
+            if not self.traceback:
+                break
+            elif int((i+1)/2) >= self.ncycles:
+                break
+            oneSweepData = dcBiasData + measuredData
+            self.data.emit(oneSweepData)
+            i += 1
+        sweepFinalTemperature = self.TCont.temp
+        averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+        deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+        wholedata = [dcBiasData] + measuredData + [averageTemperature] + [deltaT]
+        self.showStatus.emit("DC bias sweep complete. Data saved.")
+        self.data.emit(wholedata)
+        self.finished.emit()
 
 class TemperatureSweepWorkerF(QObject):
     finished = pyqtSignal()
@@ -602,11 +701,12 @@ class TemperatureSweepWorkerF(QObject):
                 TempList = concatenate((TempList,TempList2))
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
-        message = "Subject: "+ self.subject + "\r\n\r\n" + "Started temperature sweep from {}K".format(self.TCont.temp)
+        message = "Started temperature sweep from {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
                     self.server,
                     self.user,
+                    self.subject,
                     message)
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
@@ -651,11 +751,12 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        message = "Subject: "+ self.subject + "\r\n\r\n" + "Stopped temperature sweep at {}K".format(self.TCont.temp)
+        message = "Stopped temperature sweep at {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
                     self.server,
                     self.user,
+                    self.subject,
                     message)
         self.finished.emit()
         
@@ -754,12 +855,12 @@ def get_valid_filename(s):
     s = str(s).strip().replace(' ', '_')
     return sub(r'(?u)[^-\w.]', '', s)
 
-def sendMessage(senderemail,password,server,user,message):
+def sendMessage(senderemail,password,server,user,subject,message):
     if len(user) == 5:
         if user[4]:
-            sendLineMessage(user[2],message)
+            sendLineMessage(user[2],"{0}\n{1}".format(subject,message))
         if user[3]:
-            sendEmailMessage(senderemail,password,server,user[1],message)
+            sendEmailMessage(senderemail,password,server,user[1],subject,message)
 
 def sendLineMessage(token,message):
     payload = {'message' : message}
@@ -768,16 +869,25 @@ def sendLineMessage(token,message):
                       params = payload)
     print("Sent line message", r.text)
 
-def sendEmailMessage(senderemail,password,server,receiveremail,message):
-    with SMTP(server,587) as smtp:
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.login(senderemail,password)
-        smtp.sendmail(senderemail, receiveremail, message)
-        smtp.quit()
+def sendEmailMessage(senderemail,password,server,receiveremail,subject, message):
+    msg = EmailMessage()
+    msg.set_content(message)
+    msg['Subject'] = subject
+    msg['From'] = senderemail
+    msg['To'] = receiveremail
+    smtp =  SMTP(server,587)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(senderemail,password)
+    smtp.send_message(msg)
+    smtp.quit()
 
 def initializeEmail(settingPath):
-    # the api key of your mailslurp account is stored in settingfile.dnd as 'api:######'
+    # Sending email has only been tested with outlook.com, but should work with other emails as well.
+    # port 587 is generatlly used, if your email server has different port, change it in sendEmailMessage function
+    # the first line of users.txt should be following:
+    # system email, password, SMTP server, subject
+    # example: "abc.outlook.com password smtp-mail.outlook.com Message from Python"
     os.chdir(settingPath)
     with open("users.txt",'r') as f:
         line = f.readline().split()
