@@ -233,7 +233,7 @@ class FakeImpd(FakeAdapter):
     def get_frequencies(self):
         return self.scannedFrequencies
     
-    def get_DCvolts(self):
+    def get_xVals(self):
         return list(self.scannedDCvs)
 
 def get_linlog_segment_list(start, end, npoints):
@@ -583,14 +583,17 @@ class DCSweepWorker(QObject):
             self.impd.start_dcSweep(i)
             self.impd.wait_to_complete()
             newdata = self.impd.read_measurement_data()
-            for i in range(len(measuredData)):
-                measuredData[i].extend(newdata[i])
-            dcBiasData.extend(self.impd.get_DCvolts())
+            for j in range(len(measuredData)):
+                measuredData[j].extend(newdata[j])
+            xVal = self.impd.get_xVals()
+            if i%2 != 0:
+                xVal.reverse()
+            dcBiasData.extend(xVal)
             if not self.traceback:
                 break
-            elif int((i+1)/2) >= self.ncycles:
+            if int((i+1)/2) >= self.ncycles:
                 break
-            oneSweepData = dcBiasData + measuredData
+            oneSweepData = [dcBiasData] + measuredData
             self.data.emit(oneSweepData)
             i += 1
         sweepFinalTemperature = self.TCont.temp

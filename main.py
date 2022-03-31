@@ -865,7 +865,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                     temperature = 'NA'
                     deltaT = 0
                 # Save the data to file
-                with open(self.sampleID_dcSweep, 'w') as f:
+                with open(self.sampleID_dcSweep, 'w', newline='') as f:
                     f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}\n\n".format(self.impd.Vac, 
                                                                                                               self.impd._freq, 
                                                                                                               self.impd.freqUnit, 
