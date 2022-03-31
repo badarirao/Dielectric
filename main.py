@@ -10,6 +10,7 @@ self.ImpdPlot = PlotWidget(self.centralwidget,viewBox=ViewBox(border = mkPen(col
 self.ImpdPlot.setBackground((255,182,193,25))
 """
 # Long term goals
+# TODO: CENTRALIZE all instrument modules
 # TODO: Option to just continuously do freqsweep and monitor the temperature (no temperature control)
 # TODO: Option to monitor temperature from other sensors
 # TODO: If MUX is connected, option to switch sample and do parallel measurements
@@ -815,7 +816,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.dcSweepWorker = DCSweepWorker(self.impd,
                                            self.TCont,
                                            self.alert.currentUser,
-                                           self.settingpath)
+                                           self.settingPath)
         self.dcSweepWorker.moveToThread(self.dcSweepthread)
         self.dcSweepthread.started.connect(self.dcSweepWorker.start_dc_sweep)
         self.dcSweepWorker.finished.connect(self.dcSweepthread.quit)
@@ -824,7 +825,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.dcSweepWorker.data.connect(self.plotDCsweepData)
         self.dcSweepWorker.showStatus.connect(self.statusBar().showMessage)
         self.dcSweepthread.finished.connect(self.finishAction)
-        self.freqthread.start()
+        self.dcSweepthread.start()
         self.initialize_dcSweep_plot()
     
     def initialize_dcSweep_plot(self):
@@ -849,27 +850,28 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.leftPlot.getAxis('bottom').setPen(pen)
         self.leftPlot.getAxis('bottom').setTickFont(font)
         self.leftPlot.setLogMode(False, False)
-        self.leftPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
+        self.leftPlot.setRange(xRange=(self.impd.dcStart, self.impd.dcStop), padding=0.05)
         self.ImpdPlot.addLegend()
         
     def plotDCsweepData(self,data=-1):
         if data != -1:
             vdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
             self.DC_sweep_data = DataFrame(vdata,columns=['DC Bias(V)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
-            try:
-                temperature = data[-2]
-                deltaT = data[-1]
-            except:
-                temperature = 'NA'
-                deltaT = 0
-            # Save the data to file
-            with open(self.sampleID_dcSweep, 'w') as f:
-                f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}\n\n".format(self.impd.Vac, 
-                                                                                                          self.impd._freq, 
-                                                                                                          self.impd.freqUnit, 
-                                                                                                          temperature, 
-                                                                                                          deltaT))
-                self.DC_sweep_data.to_csv(f,index=False)
+            if len(data) > len(vdata[0]):
+                try:
+                    temperature = data[-2]
+                    deltaT = data[-1]
+                except:
+                    temperature = 'NA'
+                    deltaT = 0
+                # Save the data to file
+                with open(self.sampleID_dcSweep, 'w') as f:
+                    f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}\n\n".format(self.impd.Vac, 
+                                                                                                              self.impd._freq, 
+                                                                                                              self.impd.freqUnit, 
+                                                                                                              temperature, 
+                                                                                                              deltaT))
+                    self.DC_sweep_data.to_csv(f,index=False)
         else:
             self.ImpdPlot.clear()
             self.rightPlot.clear()
@@ -1119,7 +1121,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     
     def updatePlotOption(self):
         font = QtGui.QFont("Roman times", 11)
-        if self.currentView == 0:
+        if self.currentView in (0,2):
             self.ImpdPlot.enableAutoRange()
         elif self.currentView == 1:
             mintemp = min(self.startTemp.value(),self.stopTemp.value())
@@ -1129,7 +1131,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         if self.choosePlot.currentIndex() == 0:
             self.phaseButton.show()
             self.lossButton.hide()
-            if self.phaseButton.isChecked() and self.currentView == 0:
+            if self.phaseButton.isChecked() and self.currentView in (0,2):
                 self.plotIndex = 1
             else:
                 self.plotIndex = 0
@@ -1143,7 +1145,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         elif self.choosePlot.currentIndex() == 2:
             self.phaseButton.hide()
             self.lossButton.show()
-            if self.lossButton.isChecked() and self.currentView == 0:
+            if self.lossButton.isChecked() and self.currentView in (0,2):
                 self.plotIndex = 3
             else:
                 self.plotIndex = 2
@@ -1175,6 +1177,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             elif self.currentView == 1:
                 try:
                     self.plotTsweepData()
+                except AttributeError:
+                    pass
+            elif self.currentView == 2:
+                try:
+                    self.plotDCsweepData()
                 except AttributeError:
                     pass
     

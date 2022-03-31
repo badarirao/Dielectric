@@ -134,6 +134,11 @@ class FakeImpd(FakeAdapter):
         self.endf = 1e7
         self.npointsf = 50
         self.sweeptypef = 1
+        self.dcStart = -1
+        self.dcStop = 1
+        self.dcPoints = 21
+        self.dcTraceback = 0 
+        self.dcNcycles = 1
         self.stopCall = False
 
     def getFreqUnit(self):
@@ -203,11 +208,33 @@ class FakeImpd(FakeAdapter):
             self.cArray.append(c)
             self.dArray.append(d)
     
+    def start_dcSweep(self,i=0):
+        if i%2 == 0:
+            self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
+        else:
+            self.scannedDCvs = linspace(self.dcStop,self.dcStart,self.dcPoints)
+        self.zArray = []
+        self.pArray = []
+        self.cArray = []
+        self.dArray = []
+        for i in range(len(self.scannedDCvs)):
+            z = randint(1000, 10000)
+            p = randint(1, 100)
+            c = uniform(1e-7, 1e-12)
+            d = uniform(0, 1)
+            self.zArray.append(z)
+            self.pArray.append(p)
+            self.cArray.append(c)
+            self.dArray.append(d)
+    
     def read_measurement_data(self):
         return [self.zArray,self.pArray,self.cArray,self.dArray]
     
     def get_frequencies(self):
         return self.scannedFrequencies
+    
+    def get_DCvolts(self):
+        return list(self.scannedDCvs)
 
 def get_linlog_segment_list(start, end, npoints):
     if start < 20:
@@ -518,10 +545,6 @@ class DCSweepWorker(QObject):
         self.npoints = self.impd.dcPoints
         self.traceback = self.impd.dcTraceback
         self.ncycles = self.impd.dcNcycles
-        if self.traceback:
-            self.spacing = 2
-        else:
-            self.spacing = 0
         self.settingPath = settingPath
         self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
         if self.impd == None:
@@ -554,25 +577,26 @@ class DCSweepWorker(QObject):
         self.showStatus.emit("Started DC bias sweep, please wait..")
         sweepInitialTemperature = self.TCont.temp
         i = 0
-        measuredData = []
+        measuredData = [[],[],[],[]]
+        dcBiasData = []
         while True:
-            if i%2 == 0:
-                self.impd.write(":SENSe1:SWEep:DIRection UP")
-            else:
-                self.impd.write(":SENSe1:SWEep:DIRection DOWN")
-            self.impd.start_dcSweep()
+            self.impd.start_dcSweep(i)
             self.impd.wait_to_complete()
-            measuredData.append(self.impd.read_measurement_data())
+            newdata = self.impd.read_measurement_data()
+            for i in range(len(measuredData)):
+                measuredData[i].extend(newdata[i])
+            dcBiasData.extend(self.impd.get_DCvolts())
             if not self.traceback:
                 break
             elif int((i+1)/2) >= self.ncycles:
                 break
+            oneSweepData = dcBiasData + measuredData
+            self.data.emit(oneSweepData)
             i += 1
         sweepFinalTemperature = self.TCont.temp
         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
         deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
-        frequencyData = [self.impd.get_DCvolts()]
-        wholedata = frequencyData + measuredData + [averageTemperature] + [deltaT]
+        wholedata = [dcBiasData] + measuredData + [averageTemperature] + [deltaT]
         self.showStatus.emit("DC bias sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()

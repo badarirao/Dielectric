@@ -297,6 +297,7 @@ class KeysightE44990A(Instrument):
         z = self.ask(":Calculate1:Data:Fdata?")
         z = z.split(',')
         z = [float(x) for i,x in enumerate(z) if i%2==0]
+        sleep(0.1)
         self.write(":Calculate1:Parameter2:Sel")
         p = self.ask(":Calculate1:Data:Fdata?")
         p = p.split(',')
@@ -349,6 +350,19 @@ class KeysightE44990A(Instrument):
         freq = self.ask(":SENS1:FREQ:DATA?")
         freq = freq.split(',')
         return [float(x) for x in freq]
+    
+    def get_xVals(self):
+        """
+        X-values depends on sweep type.
+        
+        Returns
+        -------
+        Returns x-axis values as list
+
+        """
+        xval = self.ask(":CALC1:DATA:XAX?")
+        xval = xval.split(',')
+        return [float(x) for x in xval]
     
     def reset_to_default_continuous_measurement(self):
         """
@@ -820,6 +834,13 @@ class KeysightE44990A(Instrument):
             return False
     
     def start_fSweep(self):
+        self.write(":TRIG:SINGLE")
+    
+    def start_dcSweep(self, i = 0): # needs to be a different function for Fake adapter to work
+        if i%2 == 0:
+            self.write(":SENSe1:SWEep:DIRection UP")
+        else:
+            self.write(":SENSe1:SWEep:DIRection DOWN")
         self.write(":TRIG:SINGLE")
     
     def setVac(self):
