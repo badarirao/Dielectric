@@ -433,7 +433,7 @@ class FrequencySweepWorker(QObject):
         self.TCont = TCont
         self.user = user
         self.start = self.impd.startf
-        self.end = self.impd.endf
+        self.stop = self.impd.endf
         self.npoints = self.impd.npointsf
         self.spacing = self.impd.sweeptypef
         self.settingPath = settingPath
@@ -457,7 +457,7 @@ class FrequencySweepWorker(QObject):
             self.impd.write(":SENS1:SWE:TYPE LOG") 
         elif self.spacing == 2:
             self.impd.write(":SENS1:SWE:POIN 1500")
-            segments = get_linlog_segment_list(self.start, self.end, self.npoints)
+            segments = get_linlog_segment_list(self.start, self.stop, self.npoints)
             Segments = []
             self.impd.write(":SENS1:SWE:TYPE SEGM")
             if self.impd.Vdc:
@@ -477,7 +477,7 @@ class FrequencySweepWorker(QObject):
         if self.spacing != 2:
             self.impd.write(":SENS1:SWE:POIN {}".format(self.npoints+1)) # set number of points
             self.impd.write(":SENS1:FREQ:STAR {}".format(self.start)) # set start frequency
-            self.impd.write(":SENS1:FREQ:STOP {}".format(self.end)) # set stop frequency
+            self.impd.write(":SENS1:FREQ:STOP {}".format(self.stop)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
             self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
             if self.impd.Vdc:
@@ -502,6 +502,80 @@ class FrequencySweepWorker(QObject):
         self.data.emit(wholedata)
         self.finished.emit()
         
+class DCSweepWorker(QObject):
+    finished = pyqtSignal()
+    data = pyqtSignal(list)
+    stopcall = pyqtSignal()
+    showStatus = pyqtSignal(str)
+
+    def __init__(self, impd=None, TCont=None, user = None, settingPath = None):
+        super().__init__()
+        self.impd = impd
+        self.TCont = TCont
+        self.user = user
+        self.start = self.impd.dcStart
+        self.stop = self.impd.dcStop
+        self.npoints = self.impd.dcPoints
+        self.traceback = self.impd.dcTraceback
+        self.ncycles = self.impd.dcNcycles
+        if self.traceback:
+            self.spacing = 2
+        else:
+            self.spacing = 0
+        self.settingPath = settingPath
+        self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
+        if self.impd == None:
+            self.impd = FakeImpd()
+        self.stopCall = False
+        self.stopcall.connect(self.stopcalled)
+        self.impd.setMeasurementSpeed(2)
+
+    def stopcalled(self):
+        self.stopCall = True
+
+    def start_dc_sweep(self):
+        sleep(0.1)
+        self.impd.trig_from_PC()
+        self.impd.continuous_measurement()
+        # set DC bias range to 1mA
+        # toggle DC bias constant to off
+        # set max and min dc bias voltage range
+        # you can set delay after DC bias is applied
+        self.impd.write(":SENS1:SWE:POIN {}".format(self.npoints+1)) # set number of points
+        self.impd.write(":SOURce1:BIAS:VOLTage:STARt {}".format(self.start)) # set start DC voltage
+        self.impd.write(":SOURce1:BIAS:VOLTage:STOP {}".format(self.stop)) # set stop DC voltage
+        self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
+        self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+        self.impd.write(":SENS1:SWE:TYPE BIAS")
+        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
+        self.impd.display_on()
+        self.impd.enable_display_update()
+        self.impd.setYAutoScale()
+        self.showStatus.emit("Started DC bias sweep, please wait..")
+        sweepInitialTemperature = self.TCont.temp
+        i = 0
+        measuredData = []
+        while True:
+            if i%2 == 0:
+                self.impd.write(":SENSe1:SWEep:DIRection UP")
+            else:
+                self.impd.write(":SENSe1:SWEep:DIRection DOWN")
+            self.impd.start_dcSweep()
+            self.impd.wait_to_complete()
+            measuredData.append(self.impd.read_measurement_data())
+            if not self.traceback:
+                break
+            elif int((i+1)/2) >= self.ncycles:
+                break
+            i += 1
+        sweepFinalTemperature = self.TCont.temp
+        averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+        deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+        frequencyData = [self.impd.get_DCvolts()]
+        wholedata = frequencyData + measuredData + [averageTemperature] + [deltaT]
+        self.showStatus.emit("DC bias sweep complete. Data saved.")
+        self.data.emit(wholedata)
+        self.finished.emit()
 
 class TemperatureSweepWorkerF(QObject):
     finished = pyqtSignal()

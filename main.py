@@ -41,7 +41,8 @@ from templist import Ui_Form
 from pandas import DataFrame, Series, concat
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 from utilities import IdleWorker, FrequencySweepWorker, get_valid_filename,\
-                    unique_filename, TemperatureSweepWorkerF, checkInstrument, initializeEmail
+                    unique_filename, TemperatureSweepWorkerF, checkInstrument, initializeEmail,\
+                    DCSweepWorker
 from math import log10
 from time import sleep
 from functools import partial
@@ -684,6 +685,28 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.startTempSweepThreadF()
                 self.TFsweepRun = True
                 self.currentView = 1
+        elif self.DCvoltageBox.isChecked() and not self.fixDCvolts.isChecked():
+            self.idleWorker.stopcall.emit()
+            self.idleRun = False
+            self.setFileName()
+            self.impd._freq = self.fixedFreq.value()
+            units = ['Hz','kHz','MHz']
+            self.impd.freqUnit = units[self.fixedFreqUnit.currentIndex()]
+            self.impd.dcStart = self.startVoltage.value()
+            self.impd.dcStop = self.stopVoltage.value()
+            self.impd.dcPoints = self.voltageNpoints.value()
+            self.impd.dcTraceback = self.traceback.isChecked()
+            self.impd.dcNcycles = self.Vncycles.value()
+            self.ImpdPlot.enableAutoRange()
+            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # DC bias sweep
+                self.startDCbiasSweepThread()
+                self.DCsweepRun = True
+                self.currentView = 2
+            elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked(): # temperature sweep
+                self.filenameText.setEnabled(False)
+                self.startTempSweepThreadDC()
+                self.TDCsweepRun = True
+                self.currentView = 4
         else:
             self.statusBar().showMessage("No sweep program selected.")
             self.stopProgram()
@@ -696,13 +719,12 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                                                  self.settingpath)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
-        self.fSweepWorker.finished.connect(self.finishAction)
         self.fSweepWorker.finished.connect(self.freqthread.quit)
         self.fSweepWorker.finished.connect(self.fSweepWorker.deleteLater)
         self.freqthread.finished.connect(self.freqthread.deleteLater)
         self.fSweepWorker.data.connect(self.plotFsweepData)
         self.fSweepWorker.showStatus.connect(self.statusBar().showMessage)
-        #self.thread.finished.connect(self.finishAction)
+        self.freqthread.finished.connect(self.finishAction)
         self.freqthread.start()
         self.initialize_frequencySweep_plot()
     
@@ -788,6 +810,99 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.leftPlot.getAxis('right').setLabel('tan(δ)')
                 self.rightPlot.show()
         
+    def startDCbiasSweepThread(self):
+        self.dcSweepthread = QThread()
+        self.dcSweepWorker = DCSweepWorker(self.impd,
+                                           self.TCont,
+                                           self.alert.currentUser,
+                                           self.settingpath)
+        self.dcSweepWorker.moveToThread(self.dcSweepthread)
+        self.dcSweepthread.started.connect(self.dcSweepWorker.start_dc_sweep)
+        self.dcSweepWorker.finished.connect(self.dcSweepthread.quit)
+        self.dcSweepWorker.finished.connect(self.dcSweepWorker.deleteLater)
+        self.dcSweepthread.finished.connect(self.dcSweepthread.deleteLater)
+        self.dcSweepWorker.data.connect(self.plotDCsweepData)
+        self.dcSweepWorker.showStatus.connect(self.statusBar().showMessage)
+        self.dcSweepthread.finished.connect(self.finishAction)
+        self.freqthread.start()
+        self.initialize_dcSweep_plot()
+    
+    def initialize_dcSweep_plot(self):
+        """
+        Initialize the plot to display DC bias sweep.
+
+        Returns
+        -------
+        None.
+
+        """
+        self.plotView.setRowHidden(1,True)
+        self.plotView.setRowHidden(3,True)
+        self.phaseButton.setEnabled(True)
+        self.lossButton.setEnabled(True)
+        self.ImpdPlot.clear()
+        self.rightPlot.clear()
+        styles = {'color': (0, 0, 0), 'font-size': '20px'}
+        pen = mkPen(color = (0, 0, 0), width=2)
+        font = QtGui.QFont("Roman times", 11)
+        self.leftPlot.setLabel('bottom', 'Voltage', units = 'V',**styles)
+        self.leftPlot.getAxis('bottom').setPen(pen)
+        self.leftPlot.getAxis('bottom').setTickFont(font)
+        self.leftPlot.setLogMode(False, False)
+        self.leftPlot.setRange(xRange=(self.impd.startf, self.impd.endf), padding=0.05)
+        self.ImpdPlot.addLegend()
+        
+    def plotDCsweepData(self,data=-1):
+        if data != -1:
+            vdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
+            self.DC_sweep_data = DataFrame(vdata,columns=['DC Bias(V)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
+            try:
+                temperature = data[-2]
+                deltaT = data[-1]
+            except:
+                temperature = 'NA'
+                deltaT = 0
+            # Save the data to file
+            with open(self.sampleID_dcSweep, 'w') as f:
+                f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}\n\n".format(self.impd.Vac, 
+                                                                                                          self.impd._freq, 
+                                                                                                          self.impd.freqUnit, 
+                                                                                                          temperature, 
+                                                                                                          deltaT))
+                self.DC_sweep_data.to_csv(f,index=False)
+        else:
+            self.ImpdPlot.clear()
+            self.rightPlot.clear()
+        if self.plotIndex in (0,1): # impedance only
+            pen1 = mkPen(color = (170, 85, 0), width=2)
+            pen2 = mkPen(color = (0, 170, 127), width=2)
+            self.leftPlot.plot(self.DC_sweep_data.iloc[:,0], self.DC_sweep_data.iloc[:,1], name="Frequency = {0}{1}".format(self.impd._freq,self.impd.freqUnit), pen=pen1)
+            self.rightData = PlotDataItem(self.DC_sweep_data.iloc[:,0], self.DC_sweep_data.iloc[:,2], pen=pen2)
+            self.rightPlot.addItem(self.rightData)
+            if self.plotIndex == 0:
+                self.leftPlot.hideAxis('right')
+                self.rightPlot.hide()
+            else:
+                self.leftPlot.showAxis('right')
+                self.leftPlot.getAxis('right').setLabel('Phase')
+                self.rightPlot.show()
+        elif self.plotIndex in (2,3): #Capacitance only
+            pen1 = mkPen(color = (0, 0, 255), width=2)
+            pen2 = mkPen(color = (255, 127, 0), width=2)
+            self.leftPlot.plot(self.DC_sweep_data.iloc[:,0], self.DC_sweep_data.iloc[:,3], name="Frequency = {0}{1}".format(self.impd._freq,self.impd.freqUnit), pen=pen1)
+            self.rightData = PlotDataItem(self.DC_sweep_data.iloc[:,0], self.DC_sweep_data.iloc[:,4], pen=pen2)
+            self.rightPlot.addItem(self.rightData)
+            if self.plotIndex == 2:
+                self.leftPlot.hideAxis('right')
+                self.rightPlot.hide()
+            else:
+                self.leftPlot.showAxis('right')
+                self.leftPlot.getAxis('right').setLabel('tan(δ)')
+                self.rightPlot.show()
+                
+    def startTempSweepThreadDC(self):
+        pass
+    
     def setFileName(self, initial = 0):
         """
         Autogenerate the filenames for various operations.
@@ -814,6 +929,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.sampleID = self.sampleID[:index]
             self.filenameText.setText(self.sampleID)
         self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='csv')
+        self.sampleID_dcSweep = unique_filename(directory='.', prefix = self.sampleID+'_DCsweep', datetimeformat="", ext='csv')
         self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='csv')
         
     def chooseSaveDir(self):
@@ -833,6 +949,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             os.chdir(dirName)
             self.currPath = dirName
             self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='txt')
+            self.sampleID_dcSweep = unique_filename(directory='.', prefix = self.sampleID+'_DCsweep', datetimeformat="", ext='txt')
             self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='txt')
         
     def finishAction(self):
@@ -858,14 +975,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                                                     self.settingPath)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
-        self.tSweepWorker.finished.connect(self.finishAction)
         self.tSweepWorker.finished.connect(self.tempthreadf.quit)
         self.tSweepWorker.finished.connect(self.tSweepWorker.deleteLater)
         self.tempthreadf.finished.connect(self.tempthreadf.deleteLater)
         self.tSweepWorker.data.connect(self.plotTsweepData)
         self.tSweepWorker.showStatus.connect(self.statusBar().showMessage)
         self.tSweepWorker.freqSig.connect(self.initialize_temperatureFSweep_plot)
-        #self.thread.finished.connect(self.finishAction)
+        self.tempthreadf.finished.connect(self.finishAction)
         self.tempthreadf.start()
         
     def initialize_temperatureFSweep_plot(self,fdata):
