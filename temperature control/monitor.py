@@ -93,9 +93,9 @@ ch = Chino('com3')
 #ch.write_param(' 2, 1, 1, 01,') # run pattern 1
 count = 1
 zerotime = time.time()
-file = "heat_after_tuninga1dpersec"
+file = "autotune3"
 file2 = unique_filename(directory='./',prefix=file,datetimeformat="")
-text_file = open("Raw_Output.txt", "w")
+text_file = open("Raw_Output_mar31_autotune3.txt", "w")
 while True:
     try:
         #v = float(k195.read())*1000.0  # convert v to millivolts
