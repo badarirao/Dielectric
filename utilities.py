@@ -209,10 +209,7 @@ class FakeImpd(FakeAdapter):
             self.dArray.append(d)
     
     def start_dcSweep(self,i=0):
-        if i%2 == 0:
-            self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
-        else:
-            self.scannedDCvs = linspace(self.dcStop,self.dcStart,self.dcPoints)
+        self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
         self.zArray = []
         self.pArray = []
         self.cArray = []
@@ -754,10 +751,57 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        message = "Stopped temperature sweep at {}K".format(self.TCont.temp)
+        elif self.TCont.mode == 2:
+            if self.TCont.tempList:
+                for temperature in self.TCont.tempList:
+                    self.TCont.temp = temperature
+                    # wait till present temperature reaches start temperature
+                    while abs(self.TCont.temp-temperature) > 1:
+                        self.showStatus.emit("Waiting to reach {} K".format(temperature))
+                        while abs(self.TCont.temp-temperature) > 2:
+                            if self.stopCall == True:
+                                self.TCont.reset()
+                                self.showStatus.emit("Temperature dependent scan aborted.")
+                                self.finished.emit()
+                                return
+                            sleep(2)
+                        self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
+                        count = 0
+                        # wait to stabilize at the start temperature
+                        waitCount = self.TCont.stabilizationTime*60/2
+                        while count < waitCount: # write 300 to make wait time as 10 minutes
+                            if self.stopCall == True:
+                                self.TCont.reset()
+                                self.showStatus.emit("Temperature dependent scan aborted.")
+                                self.finished.emit()
+                                return
+                            count += 1
+                            sleep(2)
+                    sweepInitialTemperature = self.TCont.temp
+                    self.impd.start_fSweep()
+                    self.impd.wait_to_complete()
+                    measuredData = self.impd.read_measurement_data()
+                    sweepFinalTemperature = self.TCont.temp
+                    averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                    deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                    wholeData = measuredData + [averageTemperature, deltaT]
+                    self.data.emit(wholeData)
+            else:
+                self.showStatus.emit("No temperature points available. Single sweep at current temperature done.")
+                sweepInitialTemperature = self.TCont.temp
+                self.impd.start_fSweep()
+                self.impd.wait_to_complete()
+                measuredData = self.impd.read_measurement_data()
+                sweepFinalTemperature = self.TCont.temp
+                averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                frequencyData = self.impd.get_frequencies()
+                wholeData = measuredData + [averageTemperature, deltaT]
+                self.freqSig.emit([frequencyData] + wholeData)
+        message = "Stopped temperature dependent scan at {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
-                    self.server,
+                    self.server,        
                     self.user,
                     self.subject,
                     message)

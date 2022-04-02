@@ -32,6 +32,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
 # TODO: add help section on how to setup system email, and also how to get line token
+# TODO: Add measurement time as one column, atleast for temperature sweep, to monitor PID control stability.
 
 import sys, os
 from PyQt5 import QtWidgets, QtGui
@@ -131,7 +132,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.show()
         freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         freqAxis.autoSIPrefix = False
-        self.temperatures = []
         self.plotIndex = 2 # 0 - z, 1 - z+phase, 2- C, 3-C+loss
         self.freqsweep = True
         self.idleRun = False
@@ -216,6 +216,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
+        self.TCont.tempList = []
         self.continuousDisplay()
     
     def checkPaths(self):
@@ -570,7 +571,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         files, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self, "QFileDialog.getOpenFileNames()", "", "All Files (*);;Temperature Files (*.txt)", options=options)
         if files:
-            self.temperatures = loadtxt(files[0])
+            try:
+                self.TCont.tempList = loadtxt(files[0])
+            except:
+                self.TCont.tempList = []
+                print("Error loading file. Please check the file.")
     
     def setVoltageCycles(self):
         if self.traceback.isChecked() and not self.fixDCvolts.isChecked():
@@ -667,7 +672,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.FsweepRun = False
         self.TFsweepRun = False
         self.finished = False
-        if not self.fixFreq.isChecked():
+        if not self.fixFreq.isChecked(): # Frequency sweep
             self.idleWorker.stopcall.emit()
             self.idleRun = False
             self.setFileName()
@@ -676,7 +681,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.impd.npointsf = self.npoints.value()
             self.impd.sweeptypef = self.spacingType.currentIndex()
             self.ImpdPlot.enableAutoRange()
-            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep
+            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep only
                 self.startFreqSweepThread()
                 self.FsweepRun = True
                 self.currentView = 0
@@ -854,6 +859,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.addLegend()
         
     def plotDCsweepData(self,data=-1):
+        self.ImpdPlot.clear()
+        self.rightPlot.clear()
         if data != -1:
             vdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
             self.DC_sweep_data = DataFrame(vdata,columns=['DC Bias(V)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
@@ -872,9 +879,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                                                                                                               temperature, 
                                                                                                               deltaT))
                     self.DC_sweep_data.to_csv(f,index=False)
-        else:
-            self.ImpdPlot.clear()
-            self.rightPlot.clear()
         if self.plotIndex in (0,1): # impedance only
             pen1 = mkPen(color = (170, 85, 0), width=2)
             pen2 = mkPen(color = (0, 170, 127), width=2)
