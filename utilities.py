@@ -752,8 +752,9 @@ class TemperatureSweepWorkerF(QObject):
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
         elif self.TCont.mode == 2:
-            if self.TCont.tempList:
-                for temperature in self.TCont.tempList:
+            if len(self.TCont.tempList):
+                tcount = 0
+                for temperature in list(self.TCont.tempList):
                     self.TCont.temp = temperature
                     # wait till present temperature reaches start temperature
                     while abs(self.TCont.temp-temperature) > 1:
@@ -785,7 +786,12 @@ class TemperatureSweepWorkerF(QObject):
                     averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                     deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
                     wholeData = measuredData + [averageTemperature, deltaT]
-                    self.data.emit(wholeData)
+                    if tcount == 0:
+                        frequencyData = self.impd.get_frequencies()
+                        self.freqSig.emit([frequencyData] + wholeData)
+                    else:
+                        self.data.emit(wholeData)
+                    tcount += 1
             else:
                 self.showStatus.emit("No temperature points available. Single sweep at current temperature done.")
                 sweepInitialTemperature = self.TCont.temp
@@ -798,6 +804,8 @@ class TemperatureSweepWorkerF(QObject):
                 frequencyData = self.impd.get_frequencies()
                 wholeData = measuredData + [averageTemperature, deltaT]
                 self.freqSig.emit([frequencyData] + wholeData)
+            if self.stopCall == False:
+                self.showStatus.emit("Temperature scan complete. Data saved.")
         message = "Stopped temperature dependent scan at {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,

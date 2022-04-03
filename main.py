@@ -572,7 +572,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self, "QFileDialog.getOpenFileNames()", "", "All Files (*);;Temperature Files (*.txt)", options=options)
         if files:
             try:
-                self.TCont.tempList = loadtxt(files[0])
+                self.TCont.tempList = loadtxt(files[0]).reshape(-1)
             except:
                 self.TCont.tempList = []
                 print("Error loading file. Please check the file.")
@@ -1048,7 +1048,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 header.append('p {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('C {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('d {}MHz'.format(round(Fdata/1e6,2)))
-            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],[pData[2+self.plotIndex+i*4]], pen = pen1))
+            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],
+                                [pData[2+self.plotIndex+i*4]], 
+                                pen = pen1, 
+                                symbol = 'o',
+                                symbolBrush = intColor((i+1), values=3),
+                                symbolSize = 5,
+                                symbolPen = intColor((i+1), values=3)))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
             else:
