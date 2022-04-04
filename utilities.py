@@ -16,7 +16,7 @@ from re import sub
 from PyQt5.QtCore import QObject, pyqtSignal
 from math import log10
 from numpy import logspace, linspace, array, append, concatenate
-from time import sleep
+from time import sleep, time
 from PyQt5.QtWidgets import QMessageBox
 from E4990A import KeysightE44990A
 from random import randint, uniform
@@ -209,10 +209,7 @@ class FakeImpd(FakeAdapter):
             self.dArray.append(d)
     
     def start_dcSweep(self,i=0):
-        if i%2 == 0:
-            self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
-        else:
-            self.scannedDCvs = linspace(self.dcStop,self.dcStart,self.dcPoints)
+        self.scannedDCvs = linspace(self.dcStart,self.dcStop,self.dcPoints)
         self.zArray = []
         self.pArray = []
         self.cArray = []
@@ -516,15 +513,18 @@ class FrequencySweepWorker(QObject):
         self.impd.enable_display_update()
         self.impd.setYAutoScale()
         self.showStatus.emit("Started frequency sweep, please wait..")
+        startTime = time()
         sweepInitialTemperature = self.TCont.temp
         self.impd.start_fSweep()
         self.impd.wait_to_complete()
         sweepFinalTemperature = self.TCont.temp
+        endTime = time()
         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
         deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
         measuredData = self.impd.read_measurement_data()
         frequencyData = [self.impd.get_frequencies()]
-        wholedata = frequencyData + measuredData + [averageTemperature] + [deltaT]
+        timeTaken = [round(endTime-startTime,3)]
+        wholedata = timeTaken + frequencyData + measuredData + [averageTemperature] + [deltaT]
         self.showStatus.emit("Frequency sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()
@@ -575,6 +575,7 @@ class DCSweepWorker(QObject):
         self.impd.enable_display_update()
         self.impd.setYAutoScale()
         self.showStatus.emit("Started DC bias sweep, please wait..")
+        startTime = time()
         sweepInitialTemperature = self.TCont.temp
         i = 0
         measuredData = [[],[],[],[]]
@@ -593,13 +594,16 @@ class DCSweepWorker(QObject):
                 break
             if int((i+1)/2) >= self.ncycles:
                 break
-            oneSweepData = [dcBiasData] + measuredData
+            timeTaken = round(time()-startTime,3)
+            oneSweepData = [timeTaken] + [dcBiasData] + measuredData
             self.data.emit(oneSweepData)
             i += 1
         sweepFinalTemperature = self.TCont.temp
+        endTime = time()
+        timeTaken = round(endTime-startTime,3)
         averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
         deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
-        wholedata = [dcBiasData] + measuredData + [averageTemperature] + [deltaT]
+        wholedata = [timeTaken] + [dcBiasData] + measuredData + [averageTemperature] + [deltaT]
         self.showStatus.emit("DC bias sweep complete. Data saved.")
         self.data.emit(wholedata)
         self.finished.emit()
@@ -711,6 +715,7 @@ class TemperatureSweepWorkerF(QObject):
                     self.user,
                     self.subject,
                     message)
+        startTime = time()
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
             self.TCont.tCount = 0 # required for Fake temperature controller
@@ -733,7 +738,8 @@ class TemperatureSweepWorkerF(QObject):
                             sweepFinalTemperature = self.TCont.temp
                             averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                             deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
-                            wholeData = measuredData + [averageTemperature, deltaT]
+                            timeElapsed = round(time() - startTime,3)
+                            wholeData = measuredData + [timeElapsed, averageTemperature, deltaT]
                             self.data.emit(wholeData)
                             break
                     else:
@@ -741,7 +747,8 @@ class TemperatureSweepWorkerF(QObject):
                 sweepFinalTemperature = self.TCont.temp
                 averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                 deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
-                wholeData = measuredData + [averageTemperature, deltaT]
+                timeElapsed = round(time() - startTime,3)
+                wholeData = measuredData + [timeElapsed, averageTemperature, deltaT]
                 if self.TCont.tCount == 0: # Include frequency data initially
                     frequencyData = self.impd.get_frequencies()
                     self.freqSig.emit([frequencyData] + wholeData)
@@ -754,10 +761,67 @@ class TemperatureSweepWorkerF(QObject):
                     break
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        message = "Stopped temperature sweep at {}K".format(self.TCont.temp)
+        elif self.TCont.mode == 2:
+            if len(self.TCont.tempList):
+                tcount = 0
+                for temperature in list(self.TCont.tempList):
+                    self.TCont.temp = temperature
+                    # wait till present temperature reaches start temperature
+                    while abs(self.TCont.temp-temperature) > 1:
+                        self.showStatus.emit("Waiting to reach {} K".format(temperature))
+                        while abs(self.TCont.temp-temperature) > 2:
+                            if self.stopCall == True:
+                                self.TCont.reset()
+                                self.showStatus.emit("Temperature dependent scan aborted.")
+                                self.finished.emit()
+                                return
+                            sleep(2)
+                        self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
+                        count = 0
+                        # wait to stabilize at the start temperature
+                        waitCount = self.TCont.stabilizationTime*60/2
+                        while count < waitCount: # write 300 to make wait time as 10 minutes
+                            if self.stopCall == True:
+                                self.TCont.reset()
+                                self.showStatus.emit("Temperature dependent scan aborted.")
+                                self.finished.emit()
+                                return
+                            count += 1
+                            sleep(2)
+                    sweepInitialTemperature = self.TCont.temp
+                    self.impd.start_fSweep()
+                    self.impd.wait_to_complete()
+                    measuredData = self.impd.read_measurement_data()
+                    sweepFinalTemperature = self.TCont.temp
+                    averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                    deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                    timeElapsed = round(time() - startTime,3)
+                    wholeData = measuredData + [timeElapsed, averageTemperature, deltaT]
+                    if tcount == 0:
+                        frequencyData = self.impd.get_frequencies()
+                        self.freqSig.emit([frequencyData] + wholeData)
+                    else:
+                        self.data.emit(wholeData)
+                    tcount += 1
+            else:
+                self.showStatus.emit("No temperature points available. Single sweep at current temperature done.")
+                sweepInitialTemperature = self.TCont.temp
+                self.impd.start_fSweep()
+                self.impd.wait_to_complete()
+                measuredData = self.impd.read_measurement_data()
+                sweepFinalTemperature = self.TCont.temp
+                averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
+                deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
+                timeElapsed = round(time() - startTime,3)
+                frequencyData = self.impd.get_frequencies()
+                wholeData = measuredData + [timeElapsed, averageTemperature, deltaT]
+                self.freqSig.emit([frequencyData] + wholeData)
+            if self.stopCall == False:
+                self.showStatus.emit("Temperature scan complete. Data saved.")
+        message = "Stopped temperature dependent scan at {}K".format(self.TCont.temp)
         sendMessage(self.senderemail,
                     self.password,
-                    self.server,
+                    self.server,        
                     self.user,
                     self.subject,
                     message)
@@ -891,6 +955,7 @@ def initializeEmail(settingPath):
     # the first line of users.txt should be following:
     # system email, password, SMTP server, subject
     # example: "abc.outlook.com password smtp-mail.outlook.com Message from Python"
+    currPath = os.getcwd()
     os.chdir(settingPath)
     with open("users.txt",'r') as f:
         line = f.readline().split()
@@ -898,4 +963,5 @@ def initializeEmail(settingPath):
         password = line[1]
         server = line[2]
         subject = " ".join(line[3:])
+    os.chdir(currPath)
     return email,password,server,subject

@@ -28,11 +28,13 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # Short Term goals
 # TODO: functionalize option for DC bias sweep with temperature.
 # TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
+# TODO: Facility to alert by email or line if any alarm is triggered.
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
 # TODO: add help section on how to setup system email, and also how to get line token
 
 import sys, os
+from datetime import datetime
 from PyQt5 import QtWidgets, QtGui
 from dielectric import Ui_ImpedanceApp
 from pyqtgraph import mkPen, intColor, ViewBox, PlotDataItem
@@ -130,7 +132,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.show()
         freqAxis = self.ImpdPlot.plotItem.getAxis('bottom')
         freqAxis.autoSIPrefix = False
-        self.temperatures = []
         self.plotIndex = 2 # 0 - z, 1 - z+phase, 2- C, 3-C+loss
         self.freqsweep = True
         self.idleRun = False
@@ -215,6 +216,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.initializeParameters()
         self.stopButton.setEnabled(False)
         self.finished = True
+        self.TCont.tempList = []
         self.continuousDisplay()
     
     def checkPaths(self):
@@ -569,7 +571,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         files, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self, "QFileDialog.getOpenFileNames()", "", "All Files (*);;Temperature Files (*.txt)", options=options)
         if files:
-            self.temperatures = loadtxt(files[0])
+            try:
+                self.TCont.tempList = loadtxt(files[0]).reshape(-1)
+            except:
+                self.TCont.tempList = []
+                print("Error loading file. Please check the file.")
     
     def setVoltageCycles(self):
         if self.traceback.isChecked() and not self.fixDCvolts.isChecked():
@@ -666,7 +672,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.FsweepRun = False
         self.TFsweepRun = False
         self.finished = False
-        if not self.fixFreq.isChecked():
+        self.measureStartTime = datetime.now().replace(microsecond=0)
+        if not self.fixFreq.isChecked(): # Frequency sweep
             self.idleWorker.stopcall.emit()
             self.idleRun = False
             self.setFileName()
@@ -675,7 +682,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.impd.npointsf = self.npoints.value()
             self.impd.sweeptypef = self.spacingType.currentIndex()
             self.ImpdPlot.enableAutoRange()
-            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep
+            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep only
                 self.startFreqSweepThread()
                 self.FsweepRun = True
                 self.currentView = 0
@@ -716,7 +723,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.fSweepWorker = FrequencySweepWorker(self.impd,
                                                  self.TCont,
                                                  self.alert.currentUser,
-                                                 self.settingpath)
+                                                 self.settingPath)
         self.fSweepWorker.moveToThread(self.freqthread)
         self.freqthread.started.connect(self.fSweepWorker.start_frequency_sweep)
         self.fSweepWorker.finished.connect(self.freqthread.quit)
@@ -760,7 +767,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def plotFsweepData(self,data=-1):
         if data != -1:
-            fdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
+            fdata = list(zip(data[1],data[2],data[3],data[4],data[5]))
             self.frequency_sweep_data = DataFrame(fdata,columns=['Frequency(Hz)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
             try:
                 temperature = data[-2]
@@ -770,7 +777,12 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 deltaT = 0
             # Save the data to file
             with open(self.sampleID_fSweep, 'w') as f:
-                f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}\n\n".format(self.impd.Vac, self.impd.Vdc, temperature, deltaT))
+                f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}, Measurement Started at:{4}, Sweep Time = {5}s\n\n".format(self.impd.Vac, 
+                                                                                                                                                     self.impd.Vdc, 
+                                                                                                                                                     temperature, 
+                                                                                                                                                     deltaT,
+                                                                                                                                                     self.measureStartTime, 
+                                                                                                                                                     data[0]))
                 self.frequency_sweep_data.to_csv(f,index=False)
         else:
             self.ImpdPlot.clear()
@@ -853,8 +865,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.ImpdPlot.addLegend()
         
     def plotDCsweepData(self,data=-1):
+        self.ImpdPlot.clear()
+        self.rightPlot.clear()
         if data != -1:
-            vdata = list(zip(data[0],data[1],data[2],data[3],data[4]))
+            vdata = list(zip(data[1],data[2],data[3],data[4],data[5]))
             self.DC_sweep_data = DataFrame(vdata,columns=['DC Bias(V)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
             if len(data) > len(vdata[0]):
                 try:
@@ -865,15 +879,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                     deltaT = 0
                 # Save the data to file
                 with open(self.sampleID_dcSweep, 'w', newline='') as f:
-                    f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}\n\n".format(self.impd.Vac, 
-                                                                                                              self.impd._freq, 
-                                                                                                              self.impd.freqUnit, 
-                                                                                                              temperature, 
-                                                                                                              deltaT))
+                    f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}, Measurement Started at:{5}, sweep time = {6}s\n\n".format(self.impd.Vac, 
+                                                                                                                                                             self.impd._freq, 
+                                                                                                                                                             self.impd.freqUnit, 
+                                                                                                                                                             temperature, 
+                                                                                                                                                             deltaT,
+                                                                                                                                                             self.measureStartTime,
+                                                                                                                                                             data[0]))
                     self.DC_sweep_data.to_csv(f,index=False)
-        else:
-            self.ImpdPlot.clear()
-            self.rightPlot.clear()
         if self.plotIndex in (0,1): # impedance only
             pen1 = mkPen(color = (170, 85, 0), width=2)
             pen2 = mkPen(color = (0, 170, 127), width=2)
@@ -1013,7 +1026,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         maxtemp = max(self.startTemp.value(),self.stopTemp.value())
         self.leftPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
         self.TFPlots = []
-        pData = [fdata[-2],fdata[-1]]
+        # pData contains row information
+        pData = [fdata[-3],fdata[-2],fdata[-1]]
         for i in range(len(fdata[0])):
             pData.append(fdata[1][i])
             pData.append(fdata[2][i])
@@ -1021,7 +1035,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             pData.append(fdata[4][i])
         self.tempData = [fdata[-2]]
         l = len(fdata[0])
-        header = ['Temperature(K)', 'ΔT(K)']
+        header = ['Time Elapsed (s)', 'Temperature(K)', 'ΔT(K)']
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
         for i,Fdata in enumerate(fdata[0]):
             pen1 = mkPen(intColor((i+1), values=3), width=2)
@@ -1043,20 +1057,26 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 header.append('p {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('C {}MHz'.format(round(Fdata/1e6,2)))
                 header.append('d {}MHz'.format(round(Fdata/1e6,2)))
-            self.TFPlots.append(self.ImpdPlot.plot([pData[0]],[pData[2+self.plotIndex+i*4]], pen = pen1))
+            self.TFPlots.append(self.ImpdPlot.plot([pData[1]],
+                                [pData[3+self.plotIndex+i*4]], 
+                                pen = pen1, 
+                                symbol = 'o',
+                                symbolBrush = intColor((i+1), values=3),
+                                symbolSize = 4,
+                                symbolPen = intColor((i+1), values=3)))
             if i not in self.plotPoints:
                 self.TFPlots[i].hide()
             else:
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name = freqlabel)
         self.dfData = DataFrame(data = [pData],columns=header)
         with open(self.sampleID_tSweepF, 'w',newline='') as f:
-            f.write("#AC Voltage = {0}V, DC Bias = {1}V\n\n".format(self.impd.Vac, self.impd.Vdc))
+            f.write("#AC Voltage = {0}V, DC Bias = {1}V, Measurement Started at:{2}\n\n".format(self.impd.Vac, self.impd.Vdc, self.measureStartTime))
             self.dfData.to_csv(f,index=False)
         
     def plotTsweepData(self, data=-1):
         if data != -1:
             self.tempData.append(data[-2])
-            pData = [data[-2],data[-1]]
+            pData = [data[-3], data[-2],data[-1]]
             for i in range(len(data[0])):
                 pData.append(data[0][i])
                 pData.append(data[1][i])
@@ -1069,7 +1089,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         else:
             self.ImpdPlot.enableAutoRange()
         for i in self.plotPoints:
-            self.TFPlots[i].setData(self.dfData.iloc[:,0],self.dfData.iloc[:,2+self.plotIndex+i*4])
+            self.TFPlots[i].setData(self.dfData.iloc[:,1],self.dfData.iloc[:,3+self.plotIndex+i*4])
                 
         ## Handle view resizing 
     def updateViews(self):
