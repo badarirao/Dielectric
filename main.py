@@ -32,6 +32,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
 # TODO: add help section on how to setup system email, and also how to get line token
+# TODO: Check if from RT, is it possible to cool to 20K at 1K/min. What would be the PID conditions required for that?
+# TODO: In temperature sweep, send alert when changing mode from cooling to heating or viceversa.
 
 import sys, os
 from datetime import datetime
