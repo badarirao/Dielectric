@@ -26,9 +26,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Other sweep functions?
 
 # Short Term goals
-# TODO: functionalize option for DC bias sweep.
+# TODO: functionalize option for DC bias sweep with temperature.
 # TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
-# TODO: Facility to alert by email if any alarm is triggered.
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
 # TODO: add help section on how to setup system email, and also how to get line token
