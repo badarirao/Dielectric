@@ -592,9 +592,9 @@
        <property name="geometry">
         <rect>
          <x>0</x>
-         <y>0</y>
-         <width>343</width>
-         <height>907</height>
+         <y>-142</y>
+         <width>359</width>
+         <height>900</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -1030,10 +1030,10 @@
                 <double>10.000000000000000</double>
                </property>
                <property name="maximum">
-                <double>600.000000000000000</double>
+                <double>280.000000000000000</double>
                </property>
                <property name="value">
-                <double>300.000000000000000</double>
+                <double>280.000000000000000</double>
                </property>
               </widget>
              </item>
@@ -1127,7 +1127,7 @@
               <double>10.000000000000000</double>
              </property>
              <property name="maximum">
-              <double>600.000000000000000</double>
+              <double>280.000000000000000</double>
              </property>
              <property name="value">
               <double>30.000000000000000</double>
@@ -1162,10 +1162,10 @@
               <double>10.000000000000000</double>
              </property>
              <property name="maximum">
-              <double>600.000000000000000</double>
+              <double>280.000000000000000</double>
              </property>
              <property name="value">
-              <double>300.000000000000000</double>
+              <double>280.000000000000000</double>
              </property>
             </widget>
            </item>
@@ -1201,16 +1201,16 @@
                 <set>Qt::AlignCenter</set>
                </property>
                <property name="decimals">
-                <number>0</number>
+                <number>1</number>
                </property>
                <property name="minimum">
-                <double>1.000000000000000</double>
+                <double>0.000000000000000</double>
                </property>
                <property name="maximum">
                 <double>60.000000000000000</double>
                </property>
                <property name="value">
-                <double>10.000000000000000</double>
+                <double>0.500000000000000</double>
                </property>
               </widget>
              </item>
@@ -2044,7 +2044,7 @@
      <x>0</x>
      <y>0</y>
      <width>1208</width>
-     <height>20</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

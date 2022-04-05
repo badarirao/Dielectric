@@ -26,7 +26,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: Other sweep functions?
 
 # Short Term goals
-# TODO: functionalize option for DC bias sweep.
+# TODO: functionalize option for DC bias sweep with temperature.
 # TODO: In advanced settings: measurement: option to set measurement time per point, multiple counts, etc. for idleWorder, and f&t sweep
 # TODO: Facility to alert by email or line if any alarm is triggered.
 # Parameters to be modified in advanced section:
@@ -35,6 +35,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: After temperature sweep, stay at the end temperature until the actual temperature reaches the set value.
 # TODO: Delta T is always showing to be zero. find out why
 # TODO: Display actual number of points of FSweep when lin-log spacing is used.
+# TODO: Check if from RT, is it possible to cool to 20K at 1K/min. What would be the PID conditions required for that?
+# TODO: In temperature sweep, send alert when changing mode from cooling to heating or viceversa.
 
 import sys, os
 from datetime import datetime

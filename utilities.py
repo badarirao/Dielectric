@@ -584,6 +584,7 @@ class DCSweepWorker(QObject):
             self.impd.start_dcSweep(i)
             self.impd.wait_to_complete()
             newdata = self.impd.read_measurement_data()
+            sleep(0.1)
             for j in range(len(measuredData)):
                 measuredData[j].extend(newdata[j])
             xVal = self.impd.get_xVals()
@@ -634,27 +635,43 @@ class TemperatureSweepWorkerF(QObject):
         self.stopcall.connect(self.stopcalled)
         self.impd.setMeasurementSpeed(2)
 
+    def sendAlert(self, message):
+        sendMessage(self.senderemail,
+                    self.password,
+                    self.server,
+                    self.user,
+                    self.subject,
+                    message)
+    
     def stopcalled(self):
         self.stopCall = True
         self.impd.stopCall = True
 
     def start_temperature_sweep(self):
+        self.impd.disable_display_update()
         self.TCont.temp = self.TCont.startT
         # wait till present temperature reaches start temperature
-        while abs(self.TCont.temp-self.TCont.startT) > 1:
+        unstablizeCount = 0
+        T = self.TCont.temp
+        while abs(T-self.TCont.startT) > 2:
             self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
-            while abs(self.TCont.temp-self.TCont.startT) > 2:
+            unstablizeCount = 0
+            while abs(T-self.TCont.startT) > 3:
                 if self.stopCall == True:
                     self.TCont.reset()
                     self.showStatus.emit("Temperature sweep aborted before start.")
                     self.finished.emit()
                     return
                 sleep(2)
+                T = self.TCont.temp
             self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
             count = 0
             # wait to stabilize at the start temperature
+            deltaT1 = 0
+            deltaT2 = 0
+            unstablizeCount = 0
             waitCount = self.TCont.stabilizationTime*60/2
-            while count < waitCount: # write 300 to make wait time as 10 minutes
+            while count < waitCount:
                 if self.stopCall == True:
                     self.TCont.reset()
                     self.showStatus.emit("Temperature sweep aborted before start.")
@@ -662,7 +679,24 @@ class TemperatureSweepWorkerF(QObject):
                     return
                 count += 1
                 sleep(2)
-        self.showStatus.emit("Measuring..")
+                T = self.TCont.temp
+                deltaT2 = deltaT1
+                deltaT1 = abs(T-self.TCont.startT)
+                # if temperature is continuously decreasing or not stabilizing, skip stabilization
+                if deltaT1 > deltaT2:
+                    unstablizeCount += 1 # if deltaT is conti
+                elif unstablizeCount > 0:
+                    unstablizeCount -= 1
+                if unstablizeCount > 15:
+                    break
+            if unstablizeCount > 15:
+                break
+        if unstablizeCount > 15:
+            self.showStatus.emit("Temperature stabilization failed, starting measurement.")
+            self.sendAlert("Temperature stabilization failed.")
+        else:
+            self.showStatus.emit("Measuring..")
+        self.impd.enable_display_update()
         self.impd.write(":INIT1:CONT ON")
         self.impd.trig_from_PC()
         if self.spacing == 0:   # set sweep type
@@ -699,7 +733,8 @@ class TemperatureSweepWorkerF(QObject):
                 self.impd.setVdc()
         self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
-        self.impd.write(":DISPlay:WINDow1:TRACe1:Y:AUTO")
+        self.impd.write(":DISP:ANN:FREQ ON") # Display frequency on x-axis of analyzer screen
+        self.impd.setYAutoScale()
         if self.TCont.mode == 1:
             npoints = abs(int((self.TCont.startT-self.TCont.stopT)/self.TCont.interval))
             TempList = linspace(self.TCont.startT,self.TCont.stopT,npoints+1,dtype=int)
@@ -709,12 +744,7 @@ class TemperatureSweepWorkerF(QObject):
             TempList = concatenate((TempList,[TempList[-1]]))
             tcount = 0
         message = "Started temperature sweep from {}K".format(self.TCont.temp)
-        sendMessage(self.senderemail,
-                    self.password,
-                    self.server,
-                    self.user,
-                    self.subject,
-                    message)
+        self.sendAlert(message)
         startTime = time()
         if self.TCont.mode in (0,1):
             self.TCont.rampT()
@@ -725,6 +755,7 @@ class TemperatureSweepWorkerF(QObject):
                     self.impd.start_fSweep()
                     self.impd.wait_to_complete()
                     measuredData = self.impd.read_measurement_data()
+                    sleep(0.1)
                 else:
                     smallTemp = min(TempList[tcount],TempList[tcount+1])
                     largeTemp = max(TempList[tcount],TempList[tcount+1])
@@ -732,6 +763,7 @@ class TemperatureSweepWorkerF(QObject):
                         self.impd.start_fSweep()
                         self.impd.wait_to_complete()
                         measuredData = self.impd.read_measurement_data()
+                        sleep(0.1)
                         tcount += 1
                         if tcount+1 >= len(TempList):
                             self.TCont.reset()
@@ -759,6 +791,7 @@ class TemperatureSweepWorkerF(QObject):
                     self.TCont.reset()
                     self.showStatus.emit("Temperature sweep aborted. Partial data saved.")
                     break
+                sleep(0.2)
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
         elif self.TCont.mode == 2:
@@ -792,6 +825,7 @@ class TemperatureSweepWorkerF(QObject):
                     self.impd.start_fSweep()
                     self.impd.wait_to_complete()
                     measuredData = self.impd.read_measurement_data()
+                    sleep(0.1)
                     sweepFinalTemperature = self.TCont.temp
                     averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                     deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
@@ -809,6 +843,7 @@ class TemperatureSweepWorkerF(QObject):
                 self.impd.start_fSweep()
                 self.impd.wait_to_complete()
                 measuredData = self.impd.read_measurement_data()
+                sleep(0.1)
                 sweepFinalTemperature = self.TCont.temp
                 averageTemperature = round((sweepInitialTemperature+sweepFinalTemperature)/2,2)
                 deltaT = abs(sweepFinalTemperature-sweepInitialTemperature)
@@ -819,12 +854,7 @@ class TemperatureSweepWorkerF(QObject):
             if self.stopCall == False:
                 self.showStatus.emit("Temperature scan complete. Data saved.")
         message = "Stopped temperature dependent scan at {}K".format(self.TCont.temp)
-        sendMessage(self.senderemail,
-                    self.password,
-                    self.server,        
-                    self.user,
-                    self.subject,
-                    message)
+        self.sendAlert(message)
         self.finished.emit()
         
 def get_frequencies_list(start, end, npoints, spacing):
