@@ -32,6 +32,9 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # Parameters to be modified in advanced section:
 # TODO: Monitor actual AC and DC volts applied, and display it
 # TODO: add help section on how to setup system email, and also how to get line token
+# TODO: After temperature sweep, stay at the end temperature until the actual temperature reaches the set value.
+# TODO: Delta T is always showing to be zero. find out why
+# TODO: Display actual number of points of FSweep when lin-log spacing is used.
 
 import sys, os
 from datetime import datetime

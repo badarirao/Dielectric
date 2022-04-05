@@ -213,7 +213,7 @@ class ChinoKP1000C(object):
             self.write_param(' 3, 3,1,03,00,0,',"Ramp temperature end step") # end program, and set output to zero
         else:
             self.write_param(' 3, 3,1,02,00,0,',"Ramp temperature end step") # end program, and set output to zero
-        
+            #self.write_param(' 3, 3,1,02,00,200,',"Ramp temperature end step") # end program, and set output to fixed control
         self.write_param(' 2, 1,1,01,',"Start ramp") # run pattern 1
     
     def abort(self):
@@ -221,7 +221,7 @@ class ChinoKP1000C(object):
         self.write_param(' 2, 1,2,1,',"Abort")
         
     def reset(self):
-        self.write_param(' 2, 1,4,1,',"Reset")
+        self.write_param(' 2, 1,4, ,',"Reset")
     
     def isRunning(self):
         #TODO: verify the value stored in self.status
