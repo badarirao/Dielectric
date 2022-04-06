@@ -393,6 +393,7 @@ class IdleWorker(QObject):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
+        self.impd.disable_display_update()
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
         self.impd.setMeasurementSpeed(4)
@@ -413,8 +414,9 @@ class IdleWorker(QObject):
 
     
     def initialize(self): # initialize frequency, AC voltage, DC voltage
+        self.impd.disable_display_update()
         self.impd.write(":INIT1:CONT ON")
-        self.impd.write(":SENS1:SWE:TYPE LIN")
+        self.impd.write(":SENS1:SWE:TYPE LOG")
         self.impd.write(":SENS1:SWE:POIN 2") # set number of points
         self.impd.write(":SENS1:FREQ:STAR {}".format(self.impd._freq)) # set start frequency
         self.impd.write(":SENS1:FREQ:STOP 1e7") # set stop frequency as 10 MHz
@@ -424,7 +426,6 @@ class IdleWorker(QObject):
             if not self.impd.is_BIAS_ON():
                 self.impd.enable_DC_Bias(True)
             self.impd.setVdc()
-        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         #self.display_off()
         self.impd.trig_from_internal()
         
@@ -433,8 +434,7 @@ class IdleWorker(QObject):
         self.impd.write(":SENS1:FREQ:STOP 1e7") # set stop frequency as 10 MHz
     
     def start(self):
-        self.impd.disable_display_update() # disable display update
-        self.impd.display_off()
+        #self.impd.display_off()
         self.initialize()
         self.stopCall = False
         self.initFreq = self.impd._freq
@@ -503,12 +503,11 @@ class FrequencySweepWorker(QObject):
             self.impd.write(":SENS1:FREQ:STAR {}".format(self.start)) # set start frequency
             self.impd.write(":SENS1:FREQ:STOP {}".format(self.stop)) # set stop frequency
             self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
-            self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
+            self.impd.setVac() # Set Oscillation level
             if self.impd.Vdc:
                 if not self.impd.is_BIAS_ON():
                     self.impd.enable_DC_Bias(True)
                 self.impd.setVdc()
-        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.enable_display_update()
         self.impd.setYAutoScale()
@@ -570,7 +569,6 @@ class DCSweepWorker(QObject):
         self.impd.write(":SOUR1:MODE VOLT")  # Set oscillation mode 
         self.impd.write(":SOUR1:VOLT {}".format(self.impd.Vac)) # Set Oscillation level
         self.impd.write(":SENS1:SWE:TYPE BIAS")
-        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.enable_display_update()
         self.impd.setYAutoScale()
@@ -582,7 +580,7 @@ class DCSweepWorker(QObject):
         dcBiasData = []
         while True:
             self.impd.start_dcSweep(i)
-            self.impd.wait_to_complete()
+            self.impd.setYAutoScale()
             newdata = self.impd.read_measurement_data()
             sleep(0.1)
             for j in range(len(measuredData)):
@@ -731,7 +729,6 @@ class TemperatureSweepWorkerF(QObject):
                 if not self.impd.is_BIAS_ON():
                     self.impd.enable_DC_Bias(True)
                 self.impd.setVdc()
-        self.impd.write(":SOUR1:ALC ON") # Turn on Auto Level Control
         self.impd.display_on()
         self.impd.write(":DISP:ANN:FREQ ON") # Display frequency on x-axis of analyzer screen
         self.impd.setYAutoScale()

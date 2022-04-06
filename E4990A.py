@@ -111,11 +111,13 @@ class KeysightE44990A(Instrument):
         self.ID = "E4990A"
         # set oscillating mode as voltage
         self.write(":SOUR1:MODE VOLT")
+        self.write(":SOUR1:ALC OFF") # tur off auto level control
         # set DC Bias mode as voltage
         self.write(":SOUR1:BIAS:MODE VOLT")
         self.set_measurement_parameter()
         self.set_number_of_traces_to_display(4)
         self.showSplitDisplay()
+        self.setYAutoScale()
 
     def initialize(self):
         # initialize the instrument to obtain absolute Z, phase Z, Capacitance, and loss in respective four channels
@@ -828,6 +830,7 @@ class KeysightE44990A(Instrument):
     
     def wait_to_complete(self):
         ans = float(self.ask("*OPC?"))
+        self.setYAutoScale()
         if ans == 1:
             return True
         else:

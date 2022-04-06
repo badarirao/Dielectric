@@ -34,6 +34,8 @@ self.ImpdPlot.setBackground((255,182,193,25))
 # TODO: add help section on how to setup system email, and also how to get line token
 # TODO: Check if from RT, is it possible to cool to 20K at 1K/min. What would be the PID conditions required for that?
 # TODO: In temperature sweep, send alert when changing mode from cooling to heating or viceversa.
+# TODO: In advanced settings, option to turon ON/OFF the ALC (auto level control) # when Vac is ~< 20mV, sometimes alc=ON gives error
+
 
 import sys, os
 from datetime import datetime
@@ -420,6 +422,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         #self.tempStatus.setText("{} K".format(round(self.TCont.temp,2)))
     
     def setACVolts(self):
+        self.updateACVoltage()
         self.impd.setVac()
         self.ACvoltStatus.setText("{} V".format(round(self.impd.Vac,3)))
     
