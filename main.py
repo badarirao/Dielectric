@@ -149,6 +149,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.updatePlotOption()
         self.lastfreqstate = 'sweep'
         self.yaxis = 'z'
+        self.startImmediately.setChecked(True)
         """ Display list of custom temperatures, which can be edited
         self.Form = QtWidgets.QWidget()
         self.temptable = Ui_Form()
@@ -487,6 +488,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.heatRate.setEnabled(False)
             self.stabilizationTime.setEnabled(False)
             self.tempTraceback.setEnabled(False)
+            self.stabilizeTemperature.setEnabled(False)
+            self.startImmediately.setEnabled(False)
             self.frame.hide()
             self.loadTempButton.setEnabled(False)
             self.loadTempButton.hide()
@@ -496,22 +499,29 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.startTemp.setEnabled(True)
             self.stopTemp.setEnabled(True)
             self.heatRate.setEnabled(True)
+            self.stabilizationTime.setEnabled(True)
             self.measureMode.setEnabled(True)
             self.tempTraceback.setEnabled(True)
+            self.stabilizeTemperature.setEnabled(True)
+            self.startImmediately.setEnabled(True)
             self.measureModeSet()
     
     def measureModeSet(self):
         if self.measureMode.currentIndex() == 0:
             self.tempInterval.setEnabled(False)
             self.frame.hide()
-            self.tempTraceback.show()
+            self.stabilizeTemperature.show()
+            self.startImmediately.show()
+            #self.tempTraceback.show()
             self.loadTempButton.setEnabled(False)
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
             self.loadTempButton.hide()
         elif self.measureMode.currentIndex() == 1:
             self.frame.show()
-            self.tempTraceback.show()
+            self.stabilizeTemperature.show()
+            self.startImmediately.show()
+            #self.tempTraceback.show()
             self.measureLabel.setEnabled(True)
             self.tempInterval.setEnabled(True)
             self.degreesLabel.setEnabled(True)
@@ -519,8 +529,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.loadTempButton.hide()
         elif self.measureMode.currentIndex() == 2:
             self.tempInterval.setEnabled(False)
+            self.stabilizeTemperature.hide()
+            self.startImmediately.hide()
             self.frame.hide()
-            self.tempTraceback.hide()
+            #self.tempTraceback.hide()
             self.loadTempButton.show()
             self.measureLabel.setEnabled(False)
             self.degreesLabel.setEnabled(False)
@@ -991,10 +1003,15 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def startTempSweepThreadF(self): # temperature and frequency sweep
         self.tempthreadf = QThread()
+        if self.startImmediately.isChecked():
+            startNow = True
+        elif self.stabilizeTemperature.isChecked():
+            startNow = False
         self.tSweepWorker = TemperatureSweepWorkerF(self.impd, 
                                                     self.TCont,
                                                     self.alert.currentUser,
-                                                    self.settingPath)
+                                                    self.settingPath,
+                                                    startNow = startNow)
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.tempthreadf.quit)

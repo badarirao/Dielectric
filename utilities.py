@@ -23,7 +23,7 @@ from random import randint, uniform
 from math import ceil
 from chino import ChinoKP1000C
 import requests
-#from keithley195 import Keithley195
+from keithley195 import Keithley195a
 #from advantestTR6845 import AdvantestTR6845
 
 class FakeAdapter():
@@ -115,7 +115,22 @@ class FakeTempController(FakeAdapter):
         if self.tCount > 0:
             self.tCount += 1
         return True
+
+class FakeTempSensor(FakeAdapter):
+    """Provides a fake Temperature controler for debugging purposes.
+
+    Bounces back the command so that arbitrary values testing is possible.
+
+    """
+    def __init__(self, temp=300):
+        super().__init__()
+        self._temp = temp
+        self.interval = 1
     
+    @property
+    def temp(self):
+        return self._temp
+   
 class FakeImpd(FakeAdapter):
     """Provides a fake Impedance analyzer for debugging purposes.
 
@@ -315,6 +330,11 @@ def checkInstrument(E4990Addr=None, k2700Addr=None, K195Addr=None, TR6845Addr=No
             Tcont = FakeTempController()
     else:
         Tcont = FakeTempController()
+    if K195Addr:
+        try:
+            k195 = Keithley195a(K195Addr)
+        except:
+            k195 = FakeTempSensor()
     return impd, mux, k195, Adv, Tcont
     """
     Obtain instrument address of K2450, K2700 and function generator.
@@ -614,12 +634,13 @@ class TemperatureSweepWorkerF(QObject):
     stopcall = pyqtSignal()
     showStatus = pyqtSignal(str)
 
-    def __init__(self, impd=None, TCont = None, user = None, settingPath=None):
+    def __init__(self, impd=None, TCont = None, user = None, settingPath=None, startNow = True):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
         self.user = user
         self.settingPath = settingPath
+        self.startNow = startNow
         self.senderemail, self.password, self.server, self.subject = initializeEmail(self.settingPath)
         if self.impd == None:
             self.impd = FakeImpd()
@@ -651,44 +672,46 @@ class TemperatureSweepWorkerF(QObject):
         # wait till present temperature reaches start temperature
         unstablizeCount = 0
         T = self.TCont.temp
-        while abs(T-self.TCont.startT) > 2:
-            self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
-            unstablizeCount = 0
-            while abs(T-self.TCont.startT) > 3:
-                if self.stopCall == True:
-                    self.TCont.reset()
-                    self.showStatus.emit("Temperature sweep aborted before start.")
-                    self.finished.emit()
-                    return
-                sleep(2)
-                T = self.TCont.temp
-            self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
-            count = 0
-            # wait to stabilize at the start temperature
-            deltaT1 = 0
-            deltaT2 = 0
-            unstablizeCount = 0
-            waitCount = self.TCont.stabilizationTime*60/2
-            while count < waitCount:
-                if self.stopCall == True:
-                    self.TCont.reset()
-                    self.showStatus.emit("Temperature sweep aborted before start.")
-                    self.finished.emit()
-                    return
-                count += 1
-                sleep(2)
-                T = self.TCont.temp
-                deltaT2 = deltaT1
-                deltaT1 = abs(T-self.TCont.startT)
-                # if temperature is continuously decreasing or not stabilizing, skip stabilization
-                if deltaT1 > deltaT2:
-                    unstablizeCount += 1 # if deltaT is conti
-                elif unstablizeCount > 0:
-                    unstablizeCount -= 1
+        if not self.startNow:
+            print("waiting")
+            while abs(T-self.TCont.startT) > 2:
+                self.showStatus.emit("Waiting to reach {} K".format(self.TCont.startT))
+                unstablizeCount = 0
+                while abs(T-self.TCont.startT) > 3:
+                    if self.stopCall == True:
+                        self.TCont.reset()
+                        self.showStatus.emit("Temperature sweep aborted before start.")
+                        self.finished.emit()
+                        return
+                    sleep(2)
+                    T = self.TCont.temp
+                self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
+                count = 0
+                # wait to stabilize at the start temperature
+                deltaT1 = 0
+                deltaT2 = 0
+                unstablizeCount = 0
+                waitCount = self.TCont.stabilizationTime*60/2
+                while count < waitCount:
+                    if self.stopCall == True:
+                        self.TCont.reset()
+                        self.showStatus.emit("Temperature sweep aborted before start.")
+                        self.finished.emit()
+                        return
+                    count += 1
+                    sleep(2)
+                    T = self.TCont.temp
+                    deltaT2 = deltaT1
+                    deltaT1 = abs(T-self.TCont.startT)
+                    # if temperature is continuously decreasing or not stabilizing, skip stabilization
+                    if deltaT1 > deltaT2:
+                        unstablizeCount += 1 # if deltaT is conti
+                    elif unstablizeCount > 0:
+                        unstablizeCount -= 1
+                    if unstablizeCount > 15:
+                        break
                 if unstablizeCount > 15:
                     break
-            if unstablizeCount > 15:
-                break
         if unstablizeCount > 15:
             self.showStatus.emit("Temperature stabilization failed, starting measurement.")
             self.sendAlert("Temperature stabilization failed.")
