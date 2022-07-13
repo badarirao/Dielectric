@@ -685,7 +685,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             temperature = temperature1
         elif self.sensor.currentIndex() == 2: #K195
             temperature = temperature2
-        if 0 < temperature < 400:
+        if 0 < float(temperature) < 400:
             self.tempStatus.setText("{} K".format(temperature))
         else:
             self.tempStatus.setText("NA")

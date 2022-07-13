@@ -83,7 +83,7 @@ class Keithley195a(Instrument):
     
     @property
     def temp(self):
-        self._v = self.read()
+        self._v = float(self.read())
         self._temp = vtoK(self._v)
         return self._temp
         
