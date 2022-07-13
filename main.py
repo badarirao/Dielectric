@@ -176,6 +176,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(partial(self.worker.connect_instrument,
                                             a1="GPIB0::17::INSTR",
+                                            a3="GPIB0::2::INSTR",
                                             a5='com3'))
         #self.thread.started.connect(partial(self.worker.connect_instrument,
         #                                    E4990Addr="GPIB0::17::INSTR")
@@ -189,8 +190,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.thread.start()
         
     def getInstruments(self,instruments):
-        self.impd = instruments[0]
-        self.TCont = instruments[4]
+        self.impd = instruments[0]  # Keysight Impedance Analyzer
+        self.TSense = instruments[2] # Keithley 195 multimeter
+        self.TCont = instruments[4]  # Chino temperature controller
         self.modeLabel = QtWidgets.QLabel("")
         self.modeLabel.setText("Simulation mode running")
         simulation = False
@@ -613,7 +615,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def startIdleThread(self):
         self.idlethread = QThread()
-        self.idleWorker = IdleWorker(self.impd,self.TCont)
+        self.idleWorker = IdleWorker(self.impd,self.TCont,self.TSense)
         self.idleWorker.moveToThread(self.idlethread)
         self.idlethread.started.connect(self.idleWorker.start)
         self.idleWorker.finished.connect(self.idlethread.quit)
@@ -677,8 +679,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             capacitance*=1e12
         self.capStatus.setText("{0} {1}".format(round(capacitance,3), capUnit))
         self.tandStatus.setText("{}".format(round(data[3],3)))
-        temperature = data[-1]
-        if temperature != -1:
+        temperature1 = data[-2]
+        temperature2 = data[-1]
+        if self.sensor.currentIndex() == 0: #Chino
+            temperature = temperature1
+        elif self.sensor.currentIndex() == 2: #K195
+            temperature = temperature2
+        if 0 < temperature < 400:
             self.tempStatus.setText("{} K".format(temperature))
         else:
             self.tempStatus.setText("NA")

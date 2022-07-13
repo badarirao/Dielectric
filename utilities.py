@@ -122,7 +122,7 @@ class FakeTempSensor(FakeAdapter):
     Bounces back the command so that arbitrary values testing is possible.
 
     """
-    def __init__(self, temp=300):
+    def __init__(self, temp=-1):
         super().__init__()
         self._temp = temp
         self.interval = 1
@@ -409,10 +409,11 @@ class IdleWorker(QObject):
     data = pyqtSignal(list)
     stopcall = pyqtSignal()
 
-    def __init__(self, impd=None, TCont=None):
+    def __init__(self, impd=None, TCont=None, TSense=None):
         super().__init__()
         self.impd = impd
         self.TCont = TCont
+        self.TSense = TSense
         self.impd.disable_display_update()
         self.stopCall = False
         self.stopcall.connect(self.stopcalled)
@@ -429,7 +430,8 @@ class IdleWorker(QObject):
         z, p, c, d = self.impd.get_current_values()
         self.TCont.real_data_request()
         t = self.TCont.temp
-        self.data.emit([z, p, c, d, t])
+        tSense = self.TSense.temp
+        self.data.emit([z, p, c, d, t,tSense])
         sleep(0.5)
 
     

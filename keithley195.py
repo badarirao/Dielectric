@@ -32,7 +32,7 @@ from pymeasure.instruments import Instrument
 #from instruments.units import ureg as u
 
 # find out what is the source of this formula?
-def vtodegC(v): # enter voltage in mV
+def vtoK(v): # enter voltage in mV
     if v < -3.554:
         T0 = -1.2147164E+02
         v0 = -4.1790858E+00
@@ -57,7 +57,7 @@ def vtodegC(v): # enter voltage in mV
     P = p1*(v-v0)+p2*(v-v0)**2+p3*(v-v0)**3+p4*(v-v0)**4
     Q = 1 + q1*(v-v0)+q2*(v-v0)**2+q3*(v-v0)**3
     Tc = T0 + P/Q
-    return Tc
+    return round(Tc+273.15,2)
 
 # CLASSES #####################################################################
 
@@ -79,11 +79,12 @@ class Keithley195a(Instrument):
         )
         self.write('YX')  # Removes the termination CRLF
         self.write('G1DX')  # Disable returning prefix and suffix
+        self._temp = -1
     
     @property
     def temp(self):
         self._v = self.read()
-        self._temp = vtodegC(self._v)
+        self._temp = vtoK(self._v)
         return self._temp
         
 #k195 = Keithley195a("GPIB0::2::INSTR")
