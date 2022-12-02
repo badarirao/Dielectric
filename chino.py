@@ -229,9 +229,12 @@ class ChinoKP1000C(object):
             if self.status == 0:
                 return True
             else:
-                return False
-        else:
-            return False
+                if abs(self.PV - self.SV) < 1: # wait until the present temperature reaches the set temperature
+                    return False
+                else:
+                    return True
+        else: # even if Chino returns some error, continue measurement, hence return True
+            return True
     
     def execution_parameter_request(self):
         ans = self.read_param(' 1, 2,')

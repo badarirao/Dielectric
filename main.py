@@ -311,7 +311,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
     def initializeParameters(self):
         self.updateFixedDCVoltage()
         self.updateACVoltage()
-        self.updateFixedTemperature()
+        #self.updateFixedTemperature()
         self.updateFixedFrequency()
         self.updateTempTraceback()
         self.updateTempInterval()
@@ -749,6 +749,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.freqthread = QThread()
         self.fSweepWorker = FrequencySweepWorker(self.impd,
                                                  self.TCont,
+                                                 self.TSense,
                                                  self.alert.currentUser,
                                                  self.settingPath)
         self.fSweepWorker.moveToThread(self.freqthread)
@@ -797,19 +798,31 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             fdata = list(zip(data[1],data[2],data[3],data[4],data[5]))
             self.frequency_sweep_data = DataFrame(fdata,columns=['Frequency(Hz)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
             try:
-                temperature = data[-2]
-                deltaT = data[-1]
+                temperature1 = data[-4]
+                deltaT1 = data[-3]
             except:
-                temperature = 'NA'
-                deltaT = 0
+                temperature1 = 'NA'
+                deltaT1 = 0
+            try:
+                temperature2 = data[-2]
+                deltaT2 = data[-1]
+            except:
+                temperature2 = 'NA'
+                deltaT2 = 0
+                
             # Save the data to file
             with open(self.sampleID_fSweep, 'w') as f:
-                f.write("#AC Voltage = {0}V, DC Bias = {1}V, Temperature = {2}K, ΔT = {3}, Measurement Started at:{4}, Sweep Time = {5}s\n\n".format(self.impd.Vac, 
-                                                                                                                                                     self.impd.Vdc, 
-                                                                                                                                                     temperature, 
-                                                                                                                                                     deltaT,
-                                                                                                                                                     self.measureStartTime, 
-                                                                                                                                                     data[0]))
+                f.write("#AC Voltage = {0}V, DC Bias = {1}V,\n"
+                        "Temperature = {2}K (Chino), ΔT = {3} (Chino),\n"
+                        "Temperature = {4}K (Keithley), ΔT = {5} (Keithley),\n"
+                        "Measurement Started at:{6}, Sweep Time = {7}s\n\n".format(self.impd.Vac,
+                                                                                   self.impd.Vdc,
+                                                                                   temperature1, 
+                                                                                   deltaT1,
+                                                                                   temperature2,
+                                                                                   deltaT2,
+                                                                                   self.measureStartTime, 
+                                                                                   data[0]))
                 self.frequency_sweep_data.to_csv(f,index=False)
         else:
             self.ImpdPlot.clear()
@@ -853,6 +866,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.dcSweepthread = QThread()
         self.dcSweepWorker = DCSweepWorker(self.impd,
                                            self.TCont,
+                                           self.TSense,
                                            self.alert.currentUser,
                                            self.settingPath)
         self.dcSweepWorker.moveToThread(self.dcSweepthread)
@@ -899,20 +913,31 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.DC_sweep_data = DataFrame(vdata,columns=['DC Bias(V)','Absolute Impedance Z','Absolute Phase TZ','Capacitance CP (F)', 'Loss (tanδ)'])
             if len(data) > len(vdata[0]):
                 try:
-                    temperature = data[-2]
-                    deltaT = data[-1]
+                    temperature1 = data[-4]
+                    deltaT1 = data[-3]
                 except:
-                    temperature = 'NA'
-                    deltaT = 0
+                    temperature1 = 'NA'
+                    deltaT1 = 0
+                try:
+                    temperature2 = data[-2]
+                    deltaT2 = data[-1]
+                except:
+                    temperature2 = 'NA'
+                    deltaT2 = 0
                 # Save the data to file
                 with open(self.sampleID_dcSweep, 'w', newline='') as f:
-                    f.write("#AC Voltage = {0}V, Frequency = {1}{2}, Temperature = {3}K, ΔT = {4}, Measurement Started at:{5}, sweep time = {6}s\n\n".format(self.impd.Vac, 
-                                                                                                                                                             self.impd._freq, 
-                                                                                                                                                             self.impd.freqUnit, 
-                                                                                                                                                             temperature, 
-                                                                                                                                                             deltaT,
-                                                                                                                                                             self.measureStartTime,
-                                                                                                                                                             data[0]))
+                    f.write("#AC Voltage = {0}V, Frequency = {1}{2},\n"
+                            "Temperature = {3}K (Chino), ΔT = {4} (Chino),\n"
+                            "Temperature = {5}K (Keithley), ΔT = {6} (Keithley),\n"
+                            "Measurement Started at:{7}, sweep time = {8}s\n\n".format(self.impd.Vac, 
+                                                                                       self.impd._freq, 
+                                                                                       self.impd.freqUnit, 
+                                                                                       temperature1, 
+                                                                                       deltaT1,
+                                                                                       temperature2, 
+                                                                                       deltaT2,
+                                                                                       self.measureStartTime,
+                                                                                       data[0]))
                     self.DC_sweep_data.to_csv(f,index=False)
         if self.plotIndex in (0,1): # impedance only
             pen1 = mkPen(color = (170, 85, 0), width=2)
@@ -1016,9 +1041,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             startNow = False
         self.tSweepWorker = TemperatureSweepWorkerF(self.impd, 
                                                     self.TCont,
+                                                    self.TSense,
                                                     self.alert.currentUser,
                                                     self.settingPath,
-                                                    startNow = startNow)
+                                                    startNow = startNow
+                                                    )
         self.tSweepWorker.moveToThread(self.tempthreadf)
         self.tempthreadf.started.connect(self.tSweepWorker.start_temperature_sweep)
         self.tSweepWorker.finished.connect(self.tempthreadf.quit)
@@ -1059,15 +1086,16 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.leftPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
         self.TFPlots = []
         # pData contains row information
-        pData = [fdata[-3],fdata[-2],fdata[-1]]
+        pData = [fdata[-5], fdata[-4], fdata[-3], fdata[-2], fdata[-1]]
         for i in range(len(fdata[0])):
             pData.append(fdata[1][i])
             pData.append(fdata[2][i])
             pData.append(fdata[3][i])
             pData.append(fdata[4][i])
-        self.tempData = [fdata[-2]]
+        self.tempData = [fdata[-4]] # Not used
         l = len(fdata[0])
-        header = ['Time Elapsed (s)', 'Temperature(K)', 'ΔT(K)']
+        header = ['Time Elapsed (s)', 'Temperature(K, Chino)', 'ΔT(K, Chino)', 
+                  'Temperature(K, Keithley)', 'ΔT(K, Keithley)']
         self.plotPoints = linspace(0,l,6,dtype=int,endpoint=False)
         for i,Fdata in enumerate(fdata[0]):
             pen1 = mkPen(intColor((i+1), values=3), width=2)
@@ -1107,8 +1135,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         
     def plotTsweepData(self, data=-1):
         if data != -1:
-            self.tempData.append(data[-2])
-            pData = [data[-3], data[-2],data[-1]]
+            self.tempData.append(data[-4]) # Not used
+            pData = [data[-5], data[-4], data[-3], data[-2], data[-1]]
             for i in range(len(data[0])):
                 pData.append(data[0][i])
                 pData.append(data[1][i])
