@@ -112,7 +112,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.startFreqUnit.currentIndexChanged.connect(self.updateStartFrequency)
         self.stopFreq.valueChanged.connect(self.updateStopFrequency)
         self.stopFreqUnit.currentIndexChanged.connect(self.updateStopFrequency)
-        self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
+        #self.fixedTemp.valueChanged.connect(self.updateFixedTemperature)
         self.inst.currentIndexChanged.connect(self.updateTemperatureController)
         self.fixedACvolt.valueChanged.connect(self.updateACVoltage)
         self.fixedDCvolt.valueChanged.connect(self.updateFixedDCVoltage)
@@ -357,6 +357,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.impd.Vac = self.fixedACvolt.value()
         
     def updateFixedTemperature(self):
+        print("Updating temp")
         self.TCont.temp = self.fixedTemp.value()
         
     def updateTemperatureController(self):
@@ -431,6 +432,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.TCont.mode = self.measureMode.currentIndex()
     
     def setTemperature(self):
+        print("Setting temp")
         self.TCont.temp = self.fixedTemp.value()
         #self.tempStatus.setText("{} K".format(round(self.TCont.temp,2)))
     
