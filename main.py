@@ -43,7 +43,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 import sys, os
 from datetime import datetime
 from PyQt5 import QtWidgets, QtGui
-from impedance import Ui_ImpedanceApp
+from dielectric import Ui_ImpedanceApp
 from pyqtgraph import mkPen, intColor, ViewBox, PlotDataItem
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
