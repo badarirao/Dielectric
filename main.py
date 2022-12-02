@@ -43,7 +43,7 @@ self.ImpdPlot.setBackground((255,182,193,25))
 import sys, os
 from datetime import datetime
 from PyQt5 import QtWidgets, QtGui
-from dielectric import Ui_ImpedanceApp
+from impedance import Ui_ImpedanceApp
 from pyqtgraph import mkPen, intColor, ViewBox, PlotDataItem
 from numpy import loadtxt, array, vstack, hstack, linspace, savetxt, concatenate
 from templist import Ui_Form
@@ -99,7 +99,9 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         self.alert = AlertSetting(self.settingPath,self.currPath)
         self.fixFreq.clicked.connect(self.freqOption)
         self.fixTemp.clicked.connect(self.tempOption)
+        self.temperatureBox.clicked.connect(self.tempScanOption)
         self.fixDCvolts.clicked.connect(self.DCvoltOption)
+        self.DCvoltageBox.clicked.connect(self.DCscanOption)
         self.traceback.clicked.connect(self.setVoltageCycles)
         self.startButton.clicked.connect(self.startProgram)
         self.stopButton.clicked.connect(self.stopProgram)
@@ -483,9 +485,24 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.freqsweep = True
     
     def tempOption(self):
-        if self.fixTemp.isChecked() == True and self.temperatureBox.isChecked():
+        if self.fixTemp.isChecked():
             self.fixedTemp.setEnabled(True)
             self.setFixedTemperature.setEnabled(True)
+            self.temperatureBox.setChecked(False)
+        else:
+            self.fixedTemp.setEnabled(False)
+            self.setFixedTemperature.setEnabled(False)
+    
+    def tempScanOption(self):
+        if self.temperatureBox.isChecked():
+            self.fixTemp.setChecked(False)
+            self.fixedTemp.setEnabled(False)
+            self.setFixedTemperature.setEnabled(False)
+            
+        
+        """
+        if not self.temperatureBox.isChecked():
+            self.fixedTemp.setEnabled(True)
             self.startTemp.setEnabled(False)
             self.stopTemp.setEnabled(False)
             self.measureMode.setEnabled(False)
@@ -512,6 +529,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.stabilizeTemperature.setEnabled(True)
             self.startImmediately.setEnabled(True)
             self.measureModeSet()
+        """
     
     def measureModeSet(self):
         if self.measureMode.currentIndex() == 0:
@@ -546,6 +564,34 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.loadTempButton.setEnabled(True)
     
     def DCvoltOption(self):
+        if self.fixDCvolts.isChecked():
+            self.fixedDCvolt.setEnabled(True)
+            self.setFixedDCV.setEnabled(True)
+            self.DCvoltageBox.setChecked(False)
+            self.temperatureBox.setEnabled(True)
+        else:
+            self.fixedDCvolt.setEnabled(False)
+            self.setFixedDCV.setEnabled(False)
+    
+    def DCscanOption(self):
+        if self.DCvoltageBox.isChecked():
+            self.fixDCvolts.setChecked(False)
+            self.temperatureBox.setEnabled(False)
+            self.fixedDCvolt.setEnabled(False)
+            self.setFixedDCV.setEnabled(False)
+            if not self.fixFreq.isChecked():
+                self.lastfreqstate = 'sweep'
+                self.fixFreq.setChecked(True)
+                self.freqOption()
+            else:
+                self.lastfreqstate = 'fix'
+        else:
+            self.temperatureBox.setEnabled(True)
+            if self.lastfreqstate == 'sweep':
+                self.fixFreq.setChecked(False)
+                self.freqOption()
+            
+        """    
         if self.fixDCvolts.isChecked() == True:
             if self.lastfreqstate == 'sweep':
                 self.fixFreq.setChecked(False)
@@ -591,7 +637,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             if not tbox:
                 self.temperatureBox.setChecked(False)
         self.setVoltageCycles()
-        
+        """
     def loadTemperatures(self):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog

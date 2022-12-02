@@ -13,7 +13,7 @@
   <property name="minimumSize">
    <size>
     <width>1119</width>
-    <height>730</height>
+    <height>0</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -570,8 +570,14 @@
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
+        <verstretch>1</verstretch>
        </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>0</height>
+       </size>
       </property>
       <property name="maximumSize">
        <size>
@@ -592,9 +598,9 @@
        <property name="geometry">
         <rect>
          <x>0</x>
-         <y>0</y>
+         <y>-268</y>
          <width>331</width>
-         <height>826</height>
+         <height>859</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -827,7 +833,7 @@
               <string notr="true">font-size:10pt; font-weight:600;</string>
              </property>
              <property name="text">
-              <string>Fix Frequency</string>
+              <string>Set Frequency</string>
              </property>
              <property name="tristate">
               <bool>false</bool>
@@ -896,61 +902,304 @@
          </widget>
         </item>
         <item>
-         <widget class="QGroupBox" name="temperatureBox">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>0</height>
-           </size>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>16777215</width>
-            <height>16777215</height>
-           </size>
-          </property>
+         <widget class="QGroupBox" name="groupBox">
           <property name="title">
-           <string>Temperature Scan</string>
+           <string>Temperature</string>
           </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <layout class="QGridLayout" name="gridLayout_2">
-           <item row="3" column="0">
-            <widget class="QLabel" name="startTemperatureLabel">
+          <layout class="QGridLayout" name="gridLayout_6">
+           <item row="3" column="0" colspan="2">
+            <widget class="QGroupBox" name="temperatureBox">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>16777215</height>
+              </size>
+             </property>
+             <property name="title">
+              <string>Temperature Scan</string>
+             </property>
+             <property name="checkable">
+              <bool>true</bool>
+             </property>
+             <property name="checked">
+              <bool>false</bool>
+             </property>
+             <layout class="QGridLayout" name="gridLayout_2">
+              <item row="7" column="1">
+               <widget class="QComboBox" name="measureMode">
+                <item>
+                 <property name="text">
+                  <string>Continuous</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Specify Interval</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Load from file</string>
+                 </property>
+                </item>
+               </widget>
+              </item>
+              <item row="4" column="0">
+               <widget class="QLabel" name="heatRateLabel">
+                <property name="text">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Rate (K/min)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+               </widget>
+              </item>
+              <item row="15" column="0" colspan="2">
+               <widget class="QPushButton" name="loadTempButton">
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt;&quot;&gt;Text file containing one temperature (°C) point in each line, no other text. Preferably in ascending or descending order, but not necessary.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Choose Custom Temperature Points</string>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="1">
+               <widget class="QDoubleSpinBox" name="heatRate">
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="minimum">
+                 <double>-30.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>30.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>-1.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="1">
+               <widget class="QDoubleSpinBox" name="stopTemp">
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="minimum">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>280.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>30.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="2" column="0">
+               <widget class="QLabel" name="stopTemperatureLabel">
+                <property name="text">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Stop (K)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="1">
+               <layout class="QHBoxLayout" name="horizontalLayout_9">
+                <item>
+                 <widget class="QDoubleSpinBox" name="stabilizationTime">
+                  <property name="layoutDirection">
+                   <enum>Qt::LeftToRight</enum>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                  <property name="decimals">
+                   <number>1</number>
+                  </property>
+                  <property name="minimum">
+                   <double>0.000000000000000</double>
+                  </property>
+                  <property name="maximum">
+                   <double>60.000000000000000</double>
+                  </property>
+                  <property name="value">
+                   <double>0.500000000000000</double>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="stableMinLabel">
+                  <property name="maximumSize">
+                   <size>
+                    <width>40</width>
+                    <height>16777215</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt;&quot;&gt;mins&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                  </property>
+                  <property name="alignment">
+                   <set>Qt::AlignCenter</set>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="10" column="1">
+               <widget class="QCheckBox" name="tempTraceback">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:8pt; font-weight:400;&quot;&gt;Trace back to the starting temperature at the same rate. This is to acquire both heating and cooling data in the same experiment.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="layoutDirection">
+                 <enum>Qt::RightToLeft</enum>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">font-size:10pt; font-weight:600;</string>
+                </property>
+                <property name="text">
+                 <string notr="true">Traceback</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QDoubleSpinBox" name="startTemp">
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+                <property name="minimum">
+                 <double>10.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>280.000000000000000</double>
+                </property>
+                <property name="value">
+                 <double>280.000000000000000</double>
+                </property>
+               </widget>
+              </item>
+              <item row="10" column="0">
+               <widget class="QPushButton" name="stopHeater">
+                <property name="text">
+                 <string>Stop Heater</string>
+                </property>
+               </widget>
+              </item>
+              <item row="7" column="0">
+               <widget class="QLabel" name="modeLabel">
+                <property name="text">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Mode&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="startTemperatureLabel">
+                <property name="text">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Start (K)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+               </widget>
+              </item>
+              <item row="6" column="0">
+               <widget class="QLabel" name="stabilizationLabel">
+                <property name="text">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Stabilization time&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+               </widget>
+              </item>
+              <item row="8" column="0" colspan="2">
+               <layout class="QHBoxLayout" name="horizontalLayout_10">
+                <item>
+                 <widget class="QRadioButton" name="stabilizeTemperature">
+                  <property name="text">
+                   <string>Stabilize Temperature</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="startImmediately">
+                  <property name="text">
+                   <string>Start Immediately</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="14" column="0" colspan="2">
+               <widget class="QFrame" name="frame">
+                <property name="enabled">
+                 <bool>true</bool>
+                </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>0</height>
+                 </size>
+                </property>
+                <property name="frameShape">
+                 <enum>QFrame::StyledPanel</enum>
+                </property>
+                <property name="frameShadow">
+                 <enum>QFrame::Raised</enum>
+                </property>
+                <layout class="QHBoxLayout" name="horizontalLayout">
+                 <item>
+                  <widget class="QLabel" name="measureLabel">
+                   <property name="enabled">
+                    <bool>true</bool>
+                   </property>
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt;&quot;&gt;Measure every&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QSpinBox" name="tempInterval">
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="minimum">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <number>100</number>
+                   </property>
+                   <property name="value">
+                    <number>5</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="degreesLabel">
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt;&quot;&gt;degrees&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="tempControllerLabel">
              <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Start (K)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Controller&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
             </widget>
            </item>
-           <item row="9" column="0">
-            <widget class="QLabel" name="modeLabel">
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Mode&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item row="12" column="0">
-            <widget class="QPushButton" name="stopHeater">
-             <property name="text">
-              <string>Stop Heater</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0">
-            <widget class="QLabel" name="heatRateLabel">
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Rate (K/min)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0" colspan="2">
+           <item row="2" column="0" colspan="2">
             <layout class="QHBoxLayout" name="horizontalLayout_4">
              <property name="spacing">
               <number>6</number>
@@ -961,13 +1210,16 @@
              <item>
               <widget class="QCheckBox" name="fixTemp">
                <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Click here to fix the measurement temperature&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Click here to set the measurement temperature&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="styleSheet">
                 <string notr="true">font-size:10pt; font-weight:600;</string>
                </property>
                <property name="text">
-                <string>Fix Temperature (K)</string>
+                <string>Set Temperature (K)</string>
+               </property>
+               <property name="checked">
+                <bool>false</bool>
                </property>
               </widget>
              </item>
@@ -992,6 +1244,9 @@
              </item>
              <item>
               <widget class="QPushButton" name="setFixedTemperature">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
                <property name="maximumSize">
                 <size>
                  <width>40</width>
@@ -1005,171 +1260,33 @@
              </item>
             </layout>
            </item>
-           <item row="6" column="1">
-            <widget class="QDoubleSpinBox" name="heatRate">
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-             <property name="minimum">
-              <double>-30.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>30.000000000000000</double>
-             </property>
-             <property name="value">
-              <double>-1.000000000000000</double>
-             </property>
-            </widget>
-           </item>
-           <item row="9" column="1">
-            <widget class="QComboBox" name="measureMode">
+           <item row="0" column="1">
+            <widget class="QComboBox" name="inst">
              <item>
               <property name="text">
-               <string>Continuous</string>
+               <string>Chino</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>Specify Interval</string>
+               <string>Linkam</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>Load from file</string>
+               <string>None</string>
               </property>
              </item>
-            </widget>
-           </item>
-           <item row="17" column="0" colspan="2">
-            <widget class="QPushButton" name="loadTempButton">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt;&quot;&gt;Text file containing one temperature (°C) point in each line, no other text. Preferably in ascending or descending order, but not necessary.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Choose Custom Temperature Points</string>
-             </property>
             </widget>
            </item>
            <item row="1" column="0">
-            <widget class="QLabel" name="tempControllerLabel">
+            <widget class="QLabel" name="tempSensorLabel">
              <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Controller&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Sensor&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="stopTemperatureLabel">
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Stop (K)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item row="16" column="0" colspan="2">
-            <widget class="QFrame" name="frame">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="minimumSize">
-              <size>
-               <width>0</width>
-               <height>0</height>
-              </size>
-             </property>
-             <property name="frameShape">
-              <enum>QFrame::StyledPanel</enum>
-             </property>
-             <property name="frameShadow">
-              <enum>QFrame::Raised</enum>
-             </property>
-             <layout class="QHBoxLayout" name="horizontalLayout">
-              <item>
-               <widget class="QLabel" name="measureLabel">
-                <property name="enabled">
-                 <bool>true</bool>
-                </property>
-                <property name="text">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt;&quot;&gt;Measure every&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="tempInterval">
-                <property name="alignment">
-                 <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-                </property>
-                <property name="minimum">
-                 <number>1</number>
-                </property>
-                <property name="maximum">
-                 <number>100</number>
-                </property>
-                <property name="value">
-                 <number>5</number>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QLabel" name="degreesLabel">
-                <property name="text">
-                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt;&quot;&gt;degrees&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item row="12" column="1">
-            <widget class="QCheckBox" name="tempTraceback">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:8pt; font-weight:400;&quot;&gt;Trace back to the starting temperature at the same rate. This is to acquire both heating and cooling data in the same experiment.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="layoutDirection">
-              <enum>Qt::RightToLeft</enum>
-             </property>
-             <property name="styleSheet">
-              <string notr="true">font-size:10pt; font-weight:600;</string>
-             </property>
-             <property name="text">
-              <string notr="true">Traceback</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="1">
-            <widget class="QDoubleSpinBox" name="stopTemp">
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-             <property name="minimum">
-              <double>10.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>280.000000000000000</double>
-             </property>
-             <property name="value">
-              <double>30.000000000000000</double>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QDoubleSpinBox" name="startTemp">
-             <property name="alignment">
-              <set>Qt::AlignCenter</set>
-             </property>
-             <property name="minimum">
-              <double>10.000000000000000</double>
-             </property>
-             <property name="maximum">
-              <double>280.000000000000000</double>
-             </property>
-             <property name="value">
-              <double>280.000000000000000</double>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="1">
+           <item row="1" column="1">
             <widget class="QComboBox" name="sensor">
              <item>
               <property name="text">
@@ -1193,99 +1310,6 @@
              </item>
             </widget>
            </item>
-           <item row="8" column="1">
-            <layout class="QHBoxLayout" name="horizontalLayout_9">
-             <item>
-              <widget class="QDoubleSpinBox" name="stabilizationTime">
-               <property name="layoutDirection">
-                <enum>Qt::LeftToRight</enum>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-               <property name="decimals">
-                <number>1</number>
-               </property>
-               <property name="minimum">
-                <double>0.000000000000000</double>
-               </property>
-               <property name="maximum">
-                <double>60.000000000000000</double>
-               </property>
-               <property name="value">
-                <double>0.500000000000000</double>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="stableMinLabel">
-               <property name="maximumSize">
-                <size>
-                 <width>40</width>
-                 <height>16777215</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt;&quot;&gt;mins&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignCenter</set>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="8" column="0">
-            <widget class="QLabel" name="stabilizationLabel">
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Stabilization time&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QComboBox" name="inst">
-             <item>
-              <property name="text">
-               <string>Chino</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>Linkam</string>
-              </property>
-             </item>
-             <item>
-              <property name="text">
-               <string>None</string>
-              </property>
-             </item>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="tempSensorLabel">
-             <property name="text">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Sensor&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-            </widget>
-           </item>
-           <item row="10" column="0" colspan="2">
-            <layout class="QHBoxLayout" name="horizontalLayout_10">
-             <item>
-              <widget class="QRadioButton" name="stabilizeTemperature">
-               <property name="text">
-                <string>Stabilize Temperature</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QRadioButton" name="startImmediately">
-               <property name="text">
-                <string>Start Immediately</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
           </layout>
          </widget>
         </item>
@@ -1307,7 +1331,7 @@
            <string>Voltage</string>
           </property>
           <layout class="QGridLayout" name="gridLayout_8">
-           <item row="1" column="0" colspan="2">
+           <item row="2" column="0" colspan="2">
             <widget class="QGroupBox" name="DCvoltageBox">
              <property name="title">
               <string>DC Bias Sweep</string>
@@ -1322,7 +1346,7 @@
               <item row="5" column="2">
                <widget class="QDoubleSpinBox" name="stopVoltage">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="alignment">
                  <set>Qt::AlignCenter</set>
@@ -1347,7 +1371,7 @@
               <item row="2" column="0" rowspan="2" colspan="2">
                <widget class="QLabel" name="startVoltageLabel">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="text">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Start (V)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1357,7 +1381,7 @@
               <item row="8" column="2">
                <widget class="QSpinBox" name="Vncycles">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="maximumSize">
                  <size>
@@ -1382,7 +1406,7 @@
               <item row="8" column="0" colspan="2">
                <widget class="QLabel" name="voltageNcyclesLabel">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="text">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Number of cycles&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1392,7 +1416,7 @@
               <item row="6" column="0" colspan="2">
                <widget class="QLabel" name="voltagePointsLabel">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="text">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Number of points&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1402,7 +1426,7 @@
               <item row="6" column="2">
                <widget class="QSpinBox" name="voltageNpoints">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="maximumSize">
                  <size>
@@ -1427,7 +1451,7 @@
               <item row="7" column="0" colspan="3">
                <widget class="QCheckBox" name="traceback">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:8pt; font-weight:400;&quot;&gt;Trace back to the starting voltage in same way. You can also set number of cycles to trace.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -1446,7 +1470,7 @@
               <item row="3" column="2">
                <widget class="QDoubleSpinBox" name="startVoltage">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="alignment">
                  <set>Qt::AlignCenter</set>
@@ -1471,61 +1495,12 @@
               <item row="4" column="0" rowspan="2" colspan="2">
                <widget class="QLabel" name="stopVoltageLabel">
                 <property name="enabled">
-                 <bool>false</bool>
+                 <bool>true</bool>
                 </property>
                 <property name="text">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600;&quot;&gt;Stop (V)&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                 </property>
                </widget>
-              </item>
-              <item row="1" column="0" colspan="3">
-               <layout class="QHBoxLayout" name="horizontalLayout_8">
-                <item>
-                 <widget class="QCheckBox" name="fixDCvolts">
-                  <property name="styleSheet">
-                   <string notr="true">font-size:10pt; font-weight:600;</string>
-                  </property>
-                  <property name="text">
-                   <string>Fix DC Bias</string>
-                  </property>
-                  <property name="checked">
-                   <bool>true</bool>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QDoubleSpinBox" name="fixedDCvolt">
-                  <property name="alignment">
-                   <set>Qt::AlignCenter</set>
-                  </property>
-                  <property name="decimals">
-                   <number>3</number>
-                  </property>
-                  <property name="minimum">
-                   <double>-40.000000000000000</double>
-                  </property>
-                  <property name="maximum">
-                   <double>40.000000000000000</double>
-                  </property>
-                  <property name="singleStep">
-                   <double>0.100000000000000</double>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="setFixedDCV">
-                  <property name="maximumSize">
-                   <size>
-                    <width>40</width>
-                    <height>16777215</height>
-                   </size>
-                  </property>
-                  <property name="text">
-                   <string>Set</string>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
               </item>
              </layout>
             </widget>
@@ -1541,6 +1516,9 @@
              </item>
              <item>
               <widget class="QDoubleSpinBox" name="fixedACvolt">
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
                <property name="decimals">
                 <number>3</number>
                </property>
@@ -1560,6 +1538,61 @@
              </item>
              <item>
               <widget class="QPushButton" name="setFixedACV">
+               <property name="maximumSize">
+                <size>
+                 <width>40</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="text">
+                <string>Set</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="1" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_8">
+             <item>
+              <widget class="QCheckBox" name="fixDCvolts">
+               <property name="styleSheet">
+                <string notr="true">font-size:10pt; font-weight:600;</string>
+               </property>
+               <property name="text">
+                <string>Fix DC Bias</string>
+               </property>
+               <property name="checked">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QDoubleSpinBox" name="fixedDCvolt">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="decimals">
+                <number>3</number>
+               </property>
+               <property name="minimum">
+                <double>-40.000000000000000</double>
+               </property>
+               <property name="maximum">
+                <double>40.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.100000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="setFixedDCV">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
                <property name="maximumSize">
                 <size>
                  <width>40</width>
@@ -2157,11 +2190,9 @@
   <tabstop>stopFreqUnit</tabstop>
   <tabstop>npoints</tabstop>
   <tabstop>spacingType</tabstop>
-  <tabstop>temperatureBox</tabstop>
   <tabstop>fixTemp</tabstop>
   <tabstop>fixedTemp</tabstop>
   <tabstop>setFixedTemperature</tabstop>
-  <tabstop>inst</tabstop>
   <tabstop>startTemp</tabstop>
   <tabstop>stopTemp</tabstop>
   <tabstop>heatRate</tabstop>
