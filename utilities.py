@@ -547,10 +547,10 @@ class FrequencySweepWorker(QObject):
         sweepFinalTemperature1 = self.TCont.temp
         sweepFinalTemperature2 = self.TSense.temp
         endTime = time()
-        averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature2)/2,2)
+        averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
         averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-        deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-        deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+        deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1),4)
+        deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2),4)
         measuredData = self.impd.read_measurement_data()
         frequencyData = [self.impd.get_frequencies()]
         timeTaken = [round(endTime-startTime,3)]
@@ -641,8 +641,8 @@ class DCSweepWorker(QObject):
         timeTaken = round(endTime-startTime,3)
         averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
         averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-        deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-        deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+        deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1))
+        deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2))
         wholedata = [timeTaken] + [dcBiasData] + measuredData + \
                     [averageTemperature1] + [deltaT1] + [averageTemperature2] + [deltaT2]
         self.showStatus.emit("DC bias sweep complete. Data saved.")
@@ -729,7 +729,7 @@ class TemperatureSweepWorkerF(QObject):
                     sleep(2)
                     T = self.TCont.temp
                     deltaT2 = deltaT1
-                    deltaT1 = abs(T-self.TCont.startT)
+                    deltaT1 = round(abs(T-self.TCont.startT))
                     # if temperature is continuously decreasing or not stabilizing, skip stabilization
                     if deltaT1 > deltaT2:
                         unstablizeCount += 1 # if deltaT is conti
@@ -819,8 +819,8 @@ class TemperatureSweepWorkerF(QObject):
                             sweepFinalTemperature2 = self.TSense.temp
                             averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
                             averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-                            deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-                            deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+                            deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1))
+                            deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2))
                             timeElapsed = round(time() - startTime,3)
                             wholeData = measuredData + [timeElapsed, averageTemperature1, deltaT1,
                                                         averageTemperature2, deltaT2]
@@ -832,8 +832,8 @@ class TemperatureSweepWorkerF(QObject):
                 sweepFinalTemperature2 = self.TSense.temp
                 averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
                 averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-                deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-                deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+                deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1))
+                deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2))
                 timeElapsed = round(time() - startTime,3)
                 wholeData = measuredData + [timeElapsed, averageTemperature1, deltaT1,
                                             averageTemperature2, deltaT2]
@@ -887,8 +887,8 @@ class TemperatureSweepWorkerF(QObject):
                     sweepFinalTemperature2 = self.TSense.temp
                     averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
                     averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-                    deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-                    deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+                    deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1))
+                    deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2))
                     timeElapsed = round(time() - startTime,3)
                     wholeData = measuredData + [timeElapsed, averageTemperature1, deltaT1,
                                                 averageTemperature2, deltaT2]
@@ -910,8 +910,8 @@ class TemperatureSweepWorkerF(QObject):
                 sweepFinalTemperature2 = self.TSense.temp
                 averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
                 averageTemperature2 = round((sweepInitialTemperature2+sweepFinalTemperature2)/2,2)
-                deltaT1 = abs(sweepFinalTemperature1-sweepInitialTemperature1)
-                deltaT2 = abs(sweepFinalTemperature2-sweepInitialTemperature2)
+                deltaT1 = round(abs(sweepFinalTemperature1-sweepInitialTemperature1))
+                deltaT2 = round(abs(sweepFinalTemperature2-sweepInitialTemperature2))
                 timeElapsed = round(time() - startTime,3)
                 frequencyData = self.impd.get_frequencies()
                 wholeData = measuredData + [timeElapsed, averageTemperature1, deltaT1,

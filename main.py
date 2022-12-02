@@ -865,18 +865,18 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 
             # Save the data to file
             with open(self.sampleID_fSweep, 'w') as f:
-                f.write("#AC Voltage = {0}V, DC Bias = {1}V,\n"
-                        "Temperature = {2}K (Chino), ΔT = {3} (Chino),\n"
-                        "Temperature = {4}K (Keithley), ΔT = {5} (Keithley),\n"
-                        "Measurement Started at:{6}, Sweep Time = {7}s\n\n".format(self.impd.Vac,
-                                                                                   self.impd.Vdc,
+                f.write("# AC Voltage = {0}V, DC Bias = {1}V,\n"
+                        "# Temperature = {2}K (Chino), ΔT = {3} (Chino),\n"
+                        "# Temperature = {4}K (Keithley), ΔT = {5} (Keithley),\n"
+                        "# Measurement date & time:{6}, Sweep Time = {7}s\n\n".format(round(self.impd.Vac,3),
+                                                                                   round(self.impd.Vdc,3),
                                                                                    temperature1, 
                                                                                    deltaT1,
                                                                                    temperature2,
                                                                                    deltaT2,
                                                                                    self.measureStartTime, 
                                                                                    data[0]))
-                self.frequency_sweep_data.to_csv(f,index=False)
+                self.frequency_sweep_data.to_csv(f,index=False, line_terminator='\n')
         else:
             self.ImpdPlot.clear()
             self.rightPlot.clear()
@@ -979,11 +979,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                     deltaT2 = 0
                 # Save the data to file
                 with open(self.sampleID_dcSweep, 'w', newline='') as f:
-                    f.write("#AC Voltage = {0}V, Frequency = {1}{2},\n"
-                            "Temperature = {3}K (Chino), ΔT = {4} (Chino),\n"
-                            "Temperature = {5}K (Keithley), ΔT = {6} (Keithley),\n"
-                            "Measurement Started at:{7}, sweep time = {8}s\n\n".format(self.impd.Vac, 
-                                                                                       self.impd._freq, 
+                    f.write("# AC Voltage = {0}V, Frequency = {1}{2},\n"
+                            "# Temperature = {3}K (Chino), ΔT = {4} (Chino),\n"
+                            "# Temperature = {5}K (Keithley), ΔT = {6} (Keithley),\n"
+                            "# Measurement date & time:{7}, sweep time = {8}s\n\n".format(round(self.impd.Vac,3), 
+                                                                                       round(self.impd._freq,5), 
                                                                                        self.impd.freqUnit, 
                                                                                        temperature1, 
                                                                                        deltaT1,
@@ -1183,7 +1183,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.ImpdPlot.plotItem.legend.addItem(self.TFPlots[i], name = freqlabel)
         self.dfData = DataFrame(data = [pData],columns=header)
         with open(self.sampleID_tSweepF, 'w',newline='') as f:
-            f.write("#AC Voltage = {0}V, DC Bias = {1}V, Measurement Started at:{2}\n\n".format(self.impd.Vac, self.impd.Vdc, self.measureStartTime))
+            f.write("# AC Voltage = {0}V, DC Bias = {1}V,"
+                    "# Measurement date & time:{2}\n\n".format(round(self.impd.Vac,3), 
+                                                              round(self.impd.Vdc,3), 
+                                                              self.measureStartTime))
             self.dfData.to_csv(f,index=False)
         
     def plotTsweepData(self, data=-1):
