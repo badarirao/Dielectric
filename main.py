@@ -1047,6 +1047,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 index = self.sampleID.rindex('.')
                 self.sampleID = self.sampleID[:index]
             self.filenameText.setText(self.sampleID)
+            print(self.sampleID)
         self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='csv')
         self.sampleID_dcSweep = unique_filename(directory='.', prefix = self.sampleID+'_DCsweep', datetimeformat="", ext='csv')
         self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='csv')
@@ -1063,7 +1064,14 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         options = QtWidgets.QFileDialog()
         options.setFileMode(QtWidgets.QFileDialog.Directory)
         options.setDirectory(os.getcwd())
-        dirName = options.getExistingDirectory()
+        fullName = options.getSaveFileName(self,"Choose file name and directory","","csv Files (*.csv);;All Files (*)")[0]
+        split_names = fullName.split('/')
+        dirName = "/".join(split_names[:-1])
+        fileName = split_names[-1]
+        if fileName:
+            self.filenameText.setText(fileName)
+            print(self.filenameText.text())
+            self.setFileName(1)
         if dirName:
             os.chdir(dirName)
             self.currPath = dirName
@@ -1119,6 +1127,10 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         None.
 
         """
+        self.lossButton.setChecked(False)
+        self.lossPlot()
+        self.phaseButton.setChecked(False)
+        self.phasePlot()
         self.plotView.setRowHidden(1,False)
         self.plotView.setRowHidden(3,False)
         self.phaseButton.setEnabled(False)
@@ -1205,7 +1217,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         else:
             self.ImpdPlot.enableAutoRange()
         for i in self.plotPoints:
-            self.TFPlots[i].setData(self.dfData.iloc[:,1],self.dfData.iloc[:,3+self.plotIndex+i*4])
+            self.TFPlots[i].setData(self.dfData.iloc[:,1],self.dfData.iloc[:,5+self.plotIndex+i*4])
                 
         ## Handle view resizing 
     def updateViews(self):
@@ -1263,46 +1275,57 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             maxtemp = max(self.startTemp.value(),self.stopTemp.value())
             self.ImpdPlot.setRange(xRange=(mintemp, maxtemp), padding=0.05)
             self.ImpdPlot.enableAutoRange(axis='y')
-        if self.choosePlot.currentIndex() == 0:
+        if self.choosePlot.currentIndex() == 0: # plot Z
             self.phaseButton.show()
             self.lossButton.hide()
             if self.phaseButton.isChecked() and self.currentView in (0,2):
                 self.plotIndex = 1
             else:
                 self.plotIndex = 0
-            pen = mkPen(color = (170, 85, 0), width=2)
-            styles = {'color': (170, 85, 0), 'font-size': '20px'}
-            self.leftPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles)
-            self.leftPlot.getAxis('left').setPen(pen)
+            pen1 = mkPen(color = (170, 85, 0), width=2)
+            styles1 = {'color': (170, 85, 0), 'font-size': '20px'}
+            pen2 = mkPen(color = (0, 170, 127), width=2)
+            styles2 = {'color': (0, 170, 127), 'font-size': '20px'}
+            self.leftPlot.setLabel('left', 'Impedance Z', units = 'Ω', **styles1)
+            self.leftPlot.getAxis('left').setPen(pen1)
             self.leftPlot.getAxis('left').setTickFont(font)
+            self.leftPlot.getAxis('right').setLabel('Phase', **styles2)
+            self.leftPlot.getAxis('right').setPen(pen2)
+            self.leftPlot.getAxis('right').setTickFont(font)
+            
             # hide capacitance and loss plot
             # display impedance on y-axis left
-        elif self.choosePlot.currentIndex() == 2:
+        elif self.choosePlot.currentIndex() == 2: # Plot C
             self.phaseButton.hide()
             self.lossButton.show()
             if self.lossButton.isChecked() and self.currentView in (0,2):
                 self.plotIndex = 3
             else:
                 self.plotIndex = 2
-            styles = {'color': (0, 0, 255), 'font-size': '20px'}
-            pen = mkPen(color = (0, 0, 255), width=2)
-            self.leftPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles)
-            self.leftPlot.getAxis('left').setPen(pen)
+            styles1 = {'color': (0, 0, 255), 'font-size': '20px'}
+            pen1 = mkPen(color = (0, 0, 255), width=2)
+            styles2 = {'color': (255, 127, 0), 'font-size': '20px'}
+            pen2 = mkPen(color = (255, 127, 0), width=2)
+            self.leftPlot.setLabel('left', 'Capacitance Cp', units = 'F', **styles1)
+            self.leftPlot.getAxis('left').setPen(pen1)
             self.leftPlot.getAxis('left').setTickFont(font)
+            self.leftPlot.getAxis('right').setLabel('Phase', **styles2)
+            self.leftPlot.getAxis('right').setPen(pen2)
+            self.leftPlot.getAxis('right').setTickFont(font)
             # hide impedance and phase plot
             # display capacitance on y-axis left
-        elif self.choosePlot.currentIndex() == 1:
+        elif self.choosePlot.currentIndex() == 1:  # Plot Phase in T-scan
             styles = {'color': (0, 0, 255), 'font-size': '20px'}
-            pen = mkPen(color = (0, 170, 127), width=2)
+            pen1 = mkPen(color = (0, 170, 127), width=2)
             self.leftPlot.setLabel('left', 'Phase', units = '', **styles)
             self.plotIndex = 1
-        elif self.choosePlot.currentIndex() == 3:
+        elif self.choosePlot.currentIndex() == 3: # Plot loss in T-scan
             styles = {'color': (0, 0, 255), 'font-size': '20px'}
-            pen = mkPen(color = (255, 127, 0), width=2)
+            pen1 = mkPen(color = (255, 127, 0), width=2)
             self.leftPlot.setLabel('left', 'tan(δ)', units = '', **styles)
             self.plotIndex = 3
-        self.leftPlot.getAxis('left').setPen(pen)
-        self.leftPlot.getAxis('left').setTickFont(font)
+            self.leftPlot.getAxis('left').setPen(pen1)
+            self.leftPlot.getAxis('left').setTickFont(font)
         if self.finished == True:
             if self.currentView == 0:
                 try:
