@@ -209,8 +209,13 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         if simulation == True:
             self.statusBar().addPermanentWidget(self.modeLabel)
             self.statusBar().addPermanentWidget(VLine())
-        if self.TCont.ID == 'Chino':
-            self.fixedTemp.setValue(20)
+        else:
+            if self.TCont.ID =='Chino':
+                if self.TCont.isRunning():
+                    self.TCont.real_data_request()
+                    self.fixedTemp.setValue(self.TCont.SV)
+                else:
+                    self.fixedTemp.setValue(20)
         self.statusBar().addPermanentWidget(self.statusLabel)
     
     def AlertSettings(self):
@@ -685,7 +690,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             temperature = temperature1
         elif self.sensor.currentIndex() == 2: #K195
             temperature = temperature2
-        if 0 < temperature < 400:
+        if 0 < float(temperature) < 400:
             self.tempStatus.setText("{} K".format(temperature))
         else:
             self.tempStatus.setText("NA")
@@ -1272,6 +1277,8 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.tSweepWorker.stopcall.emit()
             else:
                 self.finished = True
+        self.filenameText.setEnabled(True)
+        self.saveDir.setEnabled(True)
         self.parameterBox.setEnabled(True)
         self.statusBox.setEnabled(True)
         self.startButton.setEnabled(True)

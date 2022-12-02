@@ -24,8 +24,13 @@ LF = '\n'
 
 def checksum(message):
     message = message + ETX
-    bcc = format(sum(map(ord, message)), 'b')[-8:]
-    bcc = format(int(bcc[:4], 2), 'X') + format(int(bcc[4:], 2), 'X')
+    bcc_s = format(sum(map(ord, message)), 'b')[-8:]
+    try:
+        bcc = format(int(bcc_s[:4], 2), 'X') + format(int(bcc_s[4:], 2), 'X')
+    except Exception as e:
+        print(e)
+        print("message was: {}".format(message))
+        print("Value of bcc was: {}".format(bcc_s))
     return "".join([bcc[1], bcc[0]])
 
 
@@ -69,6 +74,7 @@ class ChinoKP1000C(object):
                 return answer[1:-5]
             else:
                 print("Some Problem in output")
+                print("Chino read_param() returned: {}".format(answer))
         else:
             print("No response!")
 
@@ -125,23 +131,28 @@ class ChinoKP1000C(object):
         self.data = self.read_param(' 1, 1,')
         if not self.data:
             return None
-        # example response: ' 1, 1, 0,0,  276.42,       0,1,2,  0.00,6,       0,0,       0,'
-        temp = self.data.split(',')
-        self.pattern_no = int(temp[1].replace(" ", ""))
-        self.step_no = int(temp[2].replace(" ", ""))
-        self.pv_status = int(temp[3].replace(" ", ""))
         try:
-            self.PV = float(temp[4].replace(" ", ""))
-        except:
-            self.PV = -1
-        self.SV = float(temp[5].replace(" ", ""))
-        self.time_display_system = int(temp[6].replace(" ", ""))
-        self.time_unit = int(temp[7].replace(" ", "")) # 1 = minute, 2 = Hours, 3 = days
-        self.time = temp[8].replace(" ", "")  # hours/minutes
-        self.status = int(temp[9].replace(" ", ""))
-        self.MV1 = float(temp[10].replace(" ", ""))
-        self._temp = self.PV
-        # TODO: if self.PV is showing out of range, then set self._temp = -1
+            # example response: ' 1, 1, 0,0,  276.42,       0,1,2,  0.00,6,       0,0,       0,'
+            temp = self.data.split(',')
+            self.pattern_no = int(temp[1].replace(" ", ""))
+            self.step_no = int(temp[2].replace(" ", ""))
+            self.pv_status = int(temp[3].replace(" ", ""))
+            try:
+                self.PV = float(temp[4].replace(" ", ""))
+            except:
+                self.PV = -1
+            self.SV = float(temp[5].replace(" ", ""))
+            self.time_display_system = int(temp[6].replace(" ", ""))
+            self.time_unit = int(temp[7].replace(" ", "")) # 1 = minute, 2 = Hours, 3 = days
+            self.time = temp[8].replace(" ", "")  # hours/minutes
+            self.status = int(temp[9].replace(" ", ""))
+            self.MV1 = float(temp[10].replace(" ", ""))
+            self._temp = self.PV
+            # TODO: if self.PV is showing out of range, then set self._temp = -1
+        except Exception as e:
+            print("Data returned from Chino: {}".format(self.data))
+            print(e)
+            return None
         return 1
 
     def get_current_temperature(self):
@@ -327,8 +338,8 @@ class ChinoKP1000C(object):
     
         
     def close(self):
-        self.program_mode()
-        self.reset()
+        #self.program_mode()
+        #self.reset()
         self.all_modes_unlock()
         self.s.close()
 

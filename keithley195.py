@@ -33,6 +33,16 @@ from pymeasure.instruments import Instrument
 
 # find out what is the source of this formula?
 def vtoK(v): # enter voltage in mV
+    T0 = 0
+    v0 = 0
+    p1 = 0
+    p2 = 0
+    p3 = 0
+    p4 = 0
+    q1 = 0
+    q2 = 0
+    q3 = 0
+        
     if v < -3.554:
         T0 = -1.2147164E+02
         v0 = -4.1790858E+00
@@ -83,7 +93,7 @@ class Keithley195a(Instrument):
     
     @property
     def temp(self):
-        self._v = self.read()
+        self._v = float(self.read())*1000
         self._temp = vtoK(self._v)
         return self._temp
         
