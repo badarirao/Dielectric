@@ -157,6 +157,7 @@ class ChinoKP1000C(object):
 
     def get_current_temperature(self):
         self.real_data_request()
+        self._temp = self.PV
         return self.PV
 
     def get_set_temperature(self):

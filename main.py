@@ -762,7 +762,7 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
             self.impd.npointsf = self.npoints.value()
             self.impd.sweeptypef = self.spacingType.currentIndex()
             self.ImpdPlot.enableAutoRange()
-            if not self.temperatureBox.isChecked() or self.fixTemp.isChecked(): # frequency sweep only
+            if not self.temperatureBox.isChecked(): # frequency sweep only
                 self.startFreqSweepThread()
                 self.FsweepRun = True
                 self.currentView = 0
@@ -791,6 +791,11 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 self.currentView = 2
             elif self.temperatureBox.isChecked() and not self.fixTemp.isChecked(): # temperature sweep
                 self.filenameText.setEnabled(False)
+                self.updateStartTemp()
+                self.updateStopTemp()
+                self.updateRateTemp()
+                self.updateStabilizationTime()
+                self.updateMeasureMode()
                 self.startTempSweepThreadDC()
                 self.TDCsweepRun = True
                 self.currentView = 4
@@ -1047,7 +1052,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
                 index = self.sampleID.rindex('.')
                 self.sampleID = self.sampleID[:index]
             self.filenameText.setText(self.sampleID)
-            print(self.sampleID)
         self.sampleID_fSweep = unique_filename(directory='.', prefix = self.sampleID+'_Fsweep', datetimeformat="", ext='csv')
         self.sampleID_dcSweep = unique_filename(directory='.', prefix = self.sampleID+'_DCsweep', datetimeformat="", ext='csv')
         self.sampleID_tSweepF = unique_filename(directory='.', prefix = self.sampleID+'_TsweepF', datetimeformat="", ext='csv')
@@ -1070,7 +1074,6 @@ class mainControl(QtWidgets.QMainWindow,Ui_ImpedanceApp):
         fileName = split_names[-1]
         if fileName:
             self.filenameText.setText(fileName)
-            print(self.filenameText.text())
             self.setFileName(1)
         if dirName:
             os.chdir(dirName)

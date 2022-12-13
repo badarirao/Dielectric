@@ -815,6 +815,7 @@ class TemperatureSweepWorkerF(QObject):
                         tcount += 1
                         if tcount+1 >= len(TempList):
                             self.TCont.reset()
+                            self.TCont.stopT = TempList[-1]
                             sweepFinalTemperature1 = self.TCont.temp
                             sweepFinalTemperature2 = self.TSense.temp
                             averageTemperature1 = round((sweepInitialTemperature1+sweepFinalTemperature1)/2,2)
@@ -844,13 +845,15 @@ class TemperatureSweepWorkerF(QObject):
                 else:
                     self.data.emit(wholeData)
                 if self.stopCall == True:
+                    self.TCont.real_data_request()
+                    self.TCont.stopT = self.TCont.temp
                     self.TCont.reset()
                     self.showStatus.emit("Temperature sweep aborted. Partial data saved.")
                     break
                 sleep(0.2)
             if self.stopCall == False:
                 self.showStatus.emit("Temperature sweep complete. Data saved.")
-        elif self.TCont.mode == 2:
+        elif self.TCont.mode == 2: # load temperature list from file
             if len(self.TCont.tempList):
                 tcount = 0
                 for temperature in list(self.TCont.tempList):
@@ -860,10 +863,7 @@ class TemperatureSweepWorkerF(QObject):
                         self.showStatus.emit("Waiting to reach {} K".format(temperature))
                         while abs(self.TCont.temp-temperature) > 2:
                             if self.stopCall == True:
-                                self.TCont.reset()
-                                self.showStatus.emit("Temperature dependent scan aborted.")
-                                self.finished.emit()
-                                return
+                                break
                             sleep(2)
                         self.showStatus.emit("Stabilizing at {} K".format(self.TCont.startT))
                         count = 0
@@ -871,12 +871,16 @@ class TemperatureSweepWorkerF(QObject):
                         waitCount = self.TCont.stabilizationTime*60/2
                         while count < waitCount: # write 300 to make wait time as 10 minutes
                             if self.stopCall == True:
-                                self.TCont.reset()
-                                self.showStatus.emit("Temperature dependent scan aborted.")
-                                self.finished.emit()
-                                return
+                                break
                             count += 1
                             sleep(2)
+                        if self.stopCall:
+                            self.TCont.real_data_request()
+                            self.TCont.stopT = self.TCont.temp
+                            self.TCont.reset()
+                            self.showStatus.emit("Temperature dependent scan aborted. Partial data saved.")
+                            self.finished.emit()
+                            break
                     sweepInitialTemperature1 = self.TCont.temp
                     sweepInitialTemperature2 = self.TSense.temp
                     self.impd.start_fSweep()
@@ -919,6 +923,7 @@ class TemperatureSweepWorkerF(QObject):
                 self.freqSig.emit([frequencyData] + wholeData)
             if self.stopCall == False:
                 self.showStatus.emit("Temperature scan complete. Data saved.")
+        self.TCont.temp = self.TCont.stopT 
         message = "Stopped temperature dependent scan at {}K".format(self.TCont.temp)
         self.sendAlert(message)
         self.finished.emit()
