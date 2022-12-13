@@ -572,7 +572,7 @@ class DCSweepWorker(QObject):
         self.TCont = TCont
         if self.TCont == None:
             self.TCont = FakeTempController()
-        self.TSense = TSense()
+        self.TSense = TSense
         if self.TSense == None:
             self.TSense = FakeTempSensor()
         self.user = user

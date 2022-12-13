@@ -845,6 +845,7 @@ class KeysightE44990A(Instrument):
         else:
             self.write(":SENSe1:SWEep:DIRection DOWN")
         self.write(":TRIG:SINGLE")
+        self.wait_to_complete()
     
     def setVac(self):
         self.write(":SOUR1:VOLT {}".format(self.Vac))
